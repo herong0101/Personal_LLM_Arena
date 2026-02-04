@@ -1,26 +1,205 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core Colors - Ancient Arena Theme */
+  --emerald-50: #ecfdf5;
+  --emerald-100: #d1fae5;
+  --emerald-200: #a7f3d0;
+  --emerald-300: #6ee7b7;
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --emerald-600: #059669;
+  --emerald-700: #047857;
+  --emerald-800: #065f46;
+  --emerald-900: #064e3b;
+  
+  --marble-50: #fafafa;
+  --marble-100: #f5f5f5;
+  --marble-200: #e5e5e5;
+  --marble-300: #d4d4d4;
+  
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  
+  --gold-400: #fbbf24;
+  --gold-500: #f59e0b;
+  --gold-600: #d97706;
+  
+  --background: #f8faf9;
+  --foreground: #1e293b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-emerald-50: var(--emerald-50);
+  --color-emerald-100: var(--emerald-100);
+  --color-emerald-200: var(--emerald-200);
+  --color-emerald-300: var(--emerald-300);
+  --color-emerald-400: var(--emerald-400);
+  --color-emerald-500: var(--emerald-500);
+  --color-emerald-600: var(--emerald-600);
+  --color-emerald-700: var(--emerald-700);
+  --color-emerald-800: var(--emerald-800);
+  --color-emerald-900: var(--emerald-900);
+  --color-marble-50: var(--marble-50);
+  --color-marble-100: var(--marble-100);
+  --color-marble-200: var(--marble-200);
+  --color-marble-300: var(--marble-300);
+  --color-slate-500: var(--slate-500);
+  --color-slate-600: var(--slate-600);
+  --color-slate-700: var(--slate-700);
+  --color-slate-800: var(--slate-800);
+  --color-slate-900: var(--slate-900);
+  --color-gold-400: var(--gold-400);
+  --color-gold-500: var(--gold-500);
+  --color-gold-600: var(--gold-600);
+  --font-serif: 'Cinzel', serif;
+  --font-sans: 'Inter', sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Stone texture effect for borders */
+.stone-border {
+  border: 2px solid var(--marble-300);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(245, 245, 245, 0.95) 50%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+}
+
+/* Metal button effect */
+.metal-button {
+  background: linear-gradient(
+    180deg,
+    var(--emerald-500) 0%,
+    var(--emerald-600) 50%,
+    var(--emerald-700) 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.1) inset,
+    0 4px 6px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.metal-button:hover {
+  background: linear-gradient(
+    180deg,
+    var(--emerald-400) 0%,
+    var(--emerald-500) 50%,
+    var(--emerald-600) 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.1) inset,
+    0 6px 12px rgba(0, 0, 0, 0.2),
+    0 3px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.metal-button:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Stone carved text effect */
+.stone-text {
+  background: linear-gradient(
+    180deg,
+    var(--slate-700) 0%,
+    var(--slate-800) 50%,
+    var(--slate-900) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Gold accent text */
+.gold-text {
+  background: linear-gradient(
+    180deg,
+    var(--gold-400) 0%,
+    var(--gold-500) 50%,
+    var(--gold-600) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card with marble effect */
+.marble-card {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(250, 250, 250, 0.9) 25%,
+    rgba(245, 245, 245, 0.95) 50%,
+    rgba(250, 250, 250, 0.9) 75%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  border: 1px solid var(--marble-200);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.05),
+    0 10px 20px rgba(0, 0, 0, 0.03);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--marble-100);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--emerald-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--emerald-500);
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px var(--emerald-400); }
+  50% { box-shadow: 0 0 20px var(--emerald-500); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
