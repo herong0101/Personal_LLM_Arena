@@ -18,6 +18,7 @@
   --marble-200: #e5e5e5;
   --marble-300: #d4d4d4;
   
+  --slate-400: #94a3b8;
   --slate-500: #64748b;
   --slate-600: #475569;
   --slate-700: #334155;
@@ -49,6 +50,7 @@
   --color-marble-100: var(--marble-100);
   --color-marble-200: var(--marble-200);
   --color-marble-300: var(--marble-300);
+  --color-slate-400: var(--slate-400);
   --color-slate-500: var(--slate-500);
   --color-slate-600: var(--slate-600);
   --color-slate-700: var(--slate-700);
