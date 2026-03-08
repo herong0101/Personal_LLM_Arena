@@ -1,14 +1,25 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AIModel, ArenaSession, MatchRound, ModelResponse, RankingResult } from '@/types';
+import {
+  AIModel,
+  ArenaMode,
+  ArenaSession,
+  ExportMetadata,
+  MatchRound,
+  ModelResponse,
+  RankingResult,
+  SessionSummary,
+  UserFeedback,
+} from '@/types';
 import { BLIND_NAMES, ARENA_CONFIG } from '@/config/models';
-import { saveCurrentSession, loadCurrentSession, clearCurrentSession } from '@/lib/storage';
+import { clearCurrentSession, saveCurrentSession, saveSessionToHistory } from '@/lib/storage';
+import { createSessionSummary } from '@/lib/session-summary';
 
-// State type
 interface ArenaState {
   currentPhase: 'landing' | 'selection' | 'arena' | 'analytics';
+  arenaMode: ArenaMode;
   selectedModels: AIModel[];
   session: ArenaSession | null;
   currentResponses: ModelResponse[];
@@ -16,25 +27,27 @@ interface ArenaState {
   error: string | null;
 }
 
-// Action types
 type ArenaAction =
   | { type: 'SET_PHASE'; payload: ArenaState['currentPhase'] }
+  | { type: 'SET_MODE'; payload: ArenaMode }
   | { type: 'SET_SELECTED_MODELS'; payload: AIModel[] }
-  | { type: 'START_SESSION'; payload: AIModel[] }
+  | { type: 'START_SESSION'; payload: { models: AIModel[]; mode: ArenaMode } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_RESPONSES'; payload: ModelResponse[] }
   | { type: 'UPDATE_RESPONSE'; payload: { index: number; response: Partial<ModelResponse> } }
-  | { type: 'SUBMIT_RANKING'; payload: RankingResult[] }
+  | { type: 'SET_SESSION'; payload: ArenaSession }
   | { type: 'REVEAL_MODELS' }
   | { type: 'NEXT_ROUND' }
-  | { type: 'END_SESSION' }
+  | { type: 'END_SESSION'; payload: ArenaSession }
   | { type: 'RESET' }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'LOAD_SESSION'; payload: ArenaSession };
+  | { type: 'LOAD_SESSION'; payload: ArenaSession }
+  | { type: 'SET_FEEDBACK'; payload: UserFeedback }
+  | { type: 'SET_EXPORT_METADATA'; payload: ExportMetadata };
 
-// Initial state
 const initialState: ArenaState = {
   currentPhase: 'landing',
+  arenaMode: 'blind',
   selectedModels: [],
   session: null,
   currentResponses: [],
@@ -42,11 +55,13 @@ const initialState: ArenaState = {
   error: null,
 };
 
-// Reducer
 function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
   switch (action.type) {
     case 'SET_PHASE':
       return { ...state, currentPhase: action.payload };
+
+    case 'SET_MODE':
+      return { ...state, arenaMode: action.payload };
 
     case 'SET_SELECTED_MODELS':
       return { ...state, selectedModels: action.payload };
@@ -54,15 +69,18 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
     case 'START_SESSION': {
       const newSession: ArenaSession = {
         id: uuidv4(),
-        selectedModels: action.payload,
+        mode: action.payload.mode,
+        selectedModels: action.payload.models,
         rounds: [],
         startTime: Date.now(),
         completed: false,
       };
+
       return {
         ...state,
         session: newSession,
-        selectedModels: action.payload,
+        selectedModels: action.payload.models,
+        arenaMode: action.payload.mode,
         currentPhase: 'arena',
         currentResponses: [],
       };
@@ -83,28 +101,13 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
       return { ...state, currentResponses: newResponses };
     }
 
-    case 'SUBMIT_RANKING': {
-      if (!state.session) return state;
-
-      const newRound: MatchRound = {
-        id: uuidv4(),
-        prompt: state.currentResponses[0]?.response ? '' : '', // Will be set separately
-        responses: state.currentResponses,
-        rankings: action.payload,
-        timestamp: Date.now(),
-        revealed: false,
-      };
-
-      const updatedSession: ArenaSession = {
-        ...state.session,
-        rounds: [...state.session.rounds, newRound],
-      };
-
+    case 'SET_SESSION':
       return {
         ...state,
-        session: updatedSession,
+        session: action.payload,
+        selectedModels: action.payload.selectedModels,
+        arenaMode: action.payload.mode,
       };
-    }
 
     case 'REVEAL_MODELS': {
       if (!state.session || state.session.rounds.length === 0) return state;
@@ -127,20 +130,13 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
         ...state,
         currentResponses: [],
         isLoading: false,
+        error: null,
       };
 
     case 'END_SESSION': {
-      if (!state.session) return state;
-
-      const completedSession: ArenaSession = {
-        ...state.session,
-        endTime: Date.now(),
-        completed: true,
-      };
-
       return {
         ...state,
-        session: completedSession,
+        session: action.payload,
         currentPhase: 'analytics',
       };
     }
@@ -156,7 +152,30 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
         ...state,
         session: action.payload,
         selectedModels: action.payload.selectedModels,
+        arenaMode: action.payload.mode,
         currentPhase: action.payload.completed ? 'analytics' : 'arena',
+      };
+
+    case 'SET_FEEDBACK':
+      if (!state.session) return state;
+
+      return {
+        ...state,
+        session: {
+          ...state.session,
+          feedback: action.payload,
+        },
+      };
+
+    case 'SET_EXPORT_METADATA':
+      if (!state.session) return state;
+
+      return {
+        ...state,
+        session: {
+          ...state.session,
+          lastExport: action.payload,
+        },
       };
 
     default:
@@ -164,17 +183,18 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
   }
 }
 
-// Context
 interface ArenaContextType {
   state: ArenaState;
   dispatch: React.Dispatch<ArenaAction>;
-  // Helper functions
+  selectMode: (mode: ArenaMode) => void;
   startSession: (models: AIModel[]) => void;
   submitPrompt: (prompt: string) => Promise<void>;
   submitRanking: (rankings: RankingResult[], prompt: string) => void;
   revealModels: () => void;
   nextRound: () => void;
   endSession: () => void;
+  saveFeedback: (feedback: UserFeedback) => void;
+  exportSessionData: (feedback?: UserFeedback) => Promise<{ fileName: string; filePath: string; exportedAt: number; payload: SessionSummary }>;
   resetArena: () => void;
   canStartNewRound: () => boolean;
   getRoundCount: () => number;
@@ -182,33 +202,42 @@ interface ArenaContextType {
 
 const ArenaContext = createContext<ArenaContextType | null>(null);
 
-// Provider
 interface ArenaProviderProps {
   children: ReactNode;
 }
 
 export function ArenaProvider({ children }: ArenaProviderProps) {
   const [state, dispatch] = useReducer(arenaReducer, initialState);
+  const savedCompletedSessionIdRef = useRef<string | null>(null);
 
-  // Load session from storage on mount
-  useEffect(() => {
-    const savedSession = loadCurrentSession();
-    if (savedSession && !savedSession.completed) {
-      dispatch({ type: 'LOAD_SESSION', payload: savedSession });
-    }
-  }, []);
-
-  // Save session to storage on changes
   useEffect(() => {
     if (state.session) {
       saveCurrentSession(state.session);
     }
   }, [state.session]);
 
-  // Helper functions
+  useEffect(() => {
+    if (!state.session?.completed) {
+      return;
+    }
+
+    if (savedCompletedSessionIdRef.current === state.session.id) {
+      return;
+    }
+
+    saveSessionToHistory(state.session);
+    savedCompletedSessionIdRef.current = state.session.id;
+  }, [state.session]);
+
+  const selectMode = (mode: ArenaMode) => {
+    dispatch({ type: 'SET_MODE', payload: mode });
+    dispatch({ type: 'SET_PHASE', payload: 'selection' });
+  };
+
   const startSession = (models: AIModel[]) => {
     clearCurrentSession();
-    dispatch({ type: 'START_SESSION', payload: models });
+    savedCompletedSessionIdRef.current = null;
+    dispatch({ type: 'START_SESSION', payload: { models, mode: state.arenaMode } });
   };
 
   const submitPrompt = async (prompt: string) => {
@@ -265,7 +294,6 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
   };
 
   const submitRanking = (rankings: RankingResult[], prompt: string) => {
-    // First create the round with the prompt
     if (!state.session) return;
 
     const newRound: MatchRound = {
@@ -282,7 +310,7 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
       rounds: [...state.session.rounds, newRound],
     };
 
-    dispatch({ type: 'LOAD_SESSION', payload: updatedSession });
+    dispatch({ type: 'SET_SESSION', payload: updatedSession });
   };
 
   const revealModels = () => {
@@ -294,12 +322,72 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
   };
 
   const endSession = () => {
-    dispatch({ type: 'END_SESSION' });
+    if (!state.session) return;
+
+    const completedSession: ArenaSession = {
+      ...state.session,
+      endTime: Date.now(),
+      completed: true,
+    };
+
+    dispatch({ type: 'END_SESSION', payload: completedSession });
     clearCurrentSession();
+  };
+
+  const saveFeedback = (feedback: UserFeedback) => {
+    dispatch({ type: 'SET_FEEDBACK', payload: feedback });
+  };
+
+  const exportSessionData = async (feedback?: UserFeedback) => {
+    if (!state.session) {
+      throw new Error('No active session to export');
+    }
+
+    const sessionToExport = feedback
+      ? {
+          ...state.session,
+          feedback,
+        }
+      : state.session;
+
+    if (feedback) {
+      dispatch({ type: 'SET_FEEDBACK', payload: feedback });
+    }
+
+    const payload = createSessionSummary(sessionToExport);
+    const response = await fetch('/api/export', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to export session data');
+    }
+
+    const exportMetadata: ExportMetadata = {
+      exportedAt: data.exportedAt,
+      filePath: data.filePath,
+      fileName: data.fileName,
+    };
+
+    dispatch({ type: 'SET_EXPORT_METADATA', payload: exportMetadata });
+
+    return {
+      fileName: data.fileName,
+      filePath: data.filePath,
+      exportedAt: data.exportedAt,
+      payload: data.payload as SessionSummary,
+    };
   };
 
   const resetArena = () => {
     clearCurrentSession();
+    savedCompletedSessionIdRef.current = null;
     dispatch({ type: 'RESET' });
   };
 
@@ -315,12 +403,15 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
   const value: ArenaContextType = {
     state,
     dispatch,
+    selectMode,
     startSession,
     submitPrompt,
     submitRanking,
     revealModels,
     nextRound,
     endSession,
+    saveFeedback,
+    exportSessionData,
     resetArena,
     canStartNewRound,
     getRoundCount,
@@ -329,7 +420,6 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
   return <ArenaContext.Provider value={value}>{children}</ArenaContext.Provider>;
 }
 
-// Custom hook
 export function useArena() {
   const context = useContext(ArenaContext);
   if (!context) {

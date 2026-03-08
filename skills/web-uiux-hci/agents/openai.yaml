@@ -1,0 +1,4 @@
+interface:
+  display_name: "Web UI/UX HCI"
+  short_description: "Design and review website UX, flows, and interactions"
+  default_prompt: "Use $web-uiux-hci to design or review a website interface, flow, or interaction."
