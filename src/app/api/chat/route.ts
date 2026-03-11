@@ -17,8 +17,6 @@ const SONNET_46_ANTHROPIC_BASE_URL = 'https://9h00200-act-aifoundry.openai.azure
 const SONNET_46_ANTHROPIC_DEPLOYMENT = 'project-04-claude-sonnet-4-6';
 const LOCAL_OLLAMA_4090_API_URL = 'http://10.61.16.31:11434/api';
 const LOCAL_OLLAMA_5090_API_URL = 'http://10.61.16.119:11434/api';
-const LOCAL_VLLM_4090_API_URL = 'http://10.61.16.101:8000';
-
 const ARENA_SYSTEM_PROMPT =
   '請一律使用繁體中文回答。不要輸出表格、Markdown 語法或簡體中文，且回答清晰簡潔。只輸出最終答案，不要輸出思考過程、推理步驟、內部提示、thought、thinking、<think>、<unused> 或任何類似標記。';
 
@@ -62,9 +60,9 @@ type LocalRuntimeConfig =
 
 const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
   'local-vllm-4090-gemma-3-27b-it-qat': {
-    kind: 'vllm',
-    apiUrl: LOCAL_VLLM_4090_API_URL,
-    model: '/mnt/model/gemma-3-27b-it-qat-compressed-tensors',
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'gemma3:27b-it-qat',
   },
   'local-ollama-5090-translategemma-27b': {
     kind: 'ollama',
@@ -169,7 +167,7 @@ const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
   'local-ollama-5090-gemma3-27b-it-qat': {
     kind: 'ollama',
     apiUrl: LOCAL_OLLAMA_5090_API_URL,
-    model: 'gemma3:27-it-qat',
+    model: 'gemma3:27b-it-qat',
   },
   'local-ollama-4090-gemma3-12b-it-qat': {
     kind: 'ollama',

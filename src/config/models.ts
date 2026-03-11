@@ -77,13 +77,13 @@ function dedupeLocalModelsByName(models: AIModel[]): AIModel[] {
 
 const LOCAL_MODELS: AIModel[] = dedupeLocalModelsByName([
   createLocalModel({
-    id: 'local-vllm-4090-gemma-3-27b-it-qat',
+    id: 'local-ollama-4090-gemma3-27b-it-qat',
     name: 'Gemma 3 27B IT QAT',
     canonicalName: 'Gemma 3 27B IT QAT',
     benchmarkLatencySeconds: 1.26,
-    serverLabel: 'vLLM 4090',
+    serverLabel: 'Ollama 4090',
     speed: 'fast',
-    description: '地端 vLLM 4090，Gemma 3 27B IT QAT 的最快可用路徑。',
+    description: '地端 Ollama 4090，Gemma 3 27B IT QAT 的已驗證可用路徑。',
   }),
   createLocalModel({
     id: 'local-ollama-5090-translategemma-27b',
@@ -264,24 +264,6 @@ const LOCAL_MODELS: AIModel[] = dedupeLocalModelsByName([
     serverLabel: 'Ollama 5090',
     speed: 'fast',
     description: '地端 Ollama 5090，gpt-oss 20B 202511。',
-  }),
-  createLocalModel({
-    id: 'local-ollama-5090-gemma3-27b-it-qat',
-    name: 'Gemma 3 27B IT QAT',
-    canonicalName: 'Gemma 3 27B IT QAT',
-    benchmarkLatencySeconds: 8.54,
-    serverLabel: 'Ollama 5090',
-    speed: 'fast',
-    description: '地端 Ollama 5090，Gemma 3 27B IT QAT。',
-  }),
-  createLocalModel({
-    id: 'local-ollama-4090-gemma3-27b-it-qat',
-    name: 'Gemma 3 27B IT QAT',
-    canonicalName: 'Gemma 3 27B IT QAT',
-    benchmarkLatencySeconds: 282.41,
-    serverLabel: 'Ollama 4090',
-    speed: 'slow',
-    description: '地端 Ollama 4090，Gemma 3 27B IT QAT。',
   }),
   createLocalModel({
     id: 'local-ollama-4090-gemma3-12b-it-qat',
