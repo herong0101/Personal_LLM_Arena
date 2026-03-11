@@ -457,6 +457,7 @@ export default function ChatStudio() {
   const [conversations, setConversations] = useState<StudioConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [isDraftComposing, setIsDraftComposing] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -805,6 +806,15 @@ export default function ChatStudio() {
   };
 
   const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    const nativeEvent = event.nativeEvent as unknown as {
+      isComposing?: boolean;
+      keyCode?: number;
+    };
+
+    if (isDraftComposing || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+      return;
+    }
+
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       void sendMessage();
@@ -1290,6 +1300,8 @@ export default function ChatStudio() {
                   <textarea
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
+                    onCompositionStart={() => setIsDraftComposing(true)}
+                    onCompositionEnd={() => setIsDraftComposing(false)}
                     onKeyDown={handleDraftKeyDown}
                     placeholder={activeConversation.settings.mode === 'image' ? '描述您想生成的圖片...' : '想問點什麼？'}
                     rows={1}
