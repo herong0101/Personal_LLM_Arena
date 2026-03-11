@@ -116,6 +116,85 @@ function getModelName(modelId: string): string {
   return AVAILABLE_MODELS.find((model) => model.id === modelId)?.name || modelId;
 }
 
+function isValidStudioMode(value: string): value is StudioMode {
+  return value in STUDIO_MODE_LABELS;
+}
+
+function normalizeStudioConversation(conversation: StudioConversation): StudioConversation {
+  const now = Date.now();
+  const textCapableModelIds = AVAILABLE_MODELS.filter((model) => model.capabilities?.includes('chat')).map((model) => model.id);
+  const imageCapableModelIds = AVAILABLE_MODELS.filter((model) => model.capabilities?.includes('image')).map((model) => model.id);
+  const resolvedMode =
+    typeof conversation.settings?.mode === 'string' && isValidStudioMode(conversation.settings.mode)
+      ? conversation.settings.mode
+      : 'chat';
+  const requestedModelId = conversation.settings?.activeModelId;
+
+  let activeModelId =
+    typeof requestedModelId === 'string' && AVAILABLE_MODELS.some((model) => model.id === requestedModelId)
+      ? requestedModelId
+      : STUDIO_DEFAULT_MODEL_ID;
+
+  if (resolvedMode === 'image' && !imageCapableModelIds.includes(activeModelId)) {
+    activeModelId = STUDIO_DEFAULT_IMAGE_MODEL_ID;
+  }
+
+  if (resolvedMode !== 'image' && !textCapableModelIds.includes(activeModelId)) {
+    activeModelId = STUDIO_DEFAULT_MODEL_ID;
+  }
+
+  const expertModelIds = Array.isArray(conversation.settings?.expertModelIds)
+    ? conversation.settings.expertModelIds.filter((modelId) => textCapableModelIds.includes(modelId)).slice(0, 3)
+    : [];
+
+  const normalizedMessages: StudioMessage[] = Array.isArray(conversation.messages)
+    ? conversation.messages
+        .filter((message) => message && typeof message.content === 'string')
+        .map((message) => ({
+          ...message,
+          id: message.id || uuidv4(),
+          role: message.role === 'user' ? 'user' : 'assistant',
+          createdAt: typeof message.createdAt === 'number' ? message.createdAt : now,
+        }))
+    : [];
+
+  const normalizedDocuments = Array.isArray(conversation.documents)
+    ? conversation.documents.filter((document) => document && typeof document.content === 'string')
+    : [];
+
+  return {
+    ...conversation,
+    id: conversation.id || uuidv4(),
+    title: typeof conversation.title === 'string' && conversation.title.trim() ? conversation.title : '新對話',
+    createdAt: typeof conversation.createdAt === 'number' ? conversation.createdAt : now,
+    updatedAt: typeof conversation.updatedAt === 'number' ? conversation.updatedAt : now,
+    messages: normalizedMessages,
+    documents: normalizedDocuments,
+    memory: {
+      summary: typeof conversation.memory?.summary === 'string' ? conversation.memory.summary : '',
+      sourceMessageCount:
+        typeof conversation.memory?.sourceMessageCount === 'number'
+          ? conversation.memory.sourceMessageCount
+          : 0,
+      updatedAt:
+        typeof conversation.memory?.updatedAt === 'number' ? conversation.memory.updatedAt : undefined,
+    },
+    settings: {
+      activeModelId,
+      mode: resolvedMode,
+      expertModelIds: expertModelIds.length > 0 ? expertModelIds : STUDIO_DEFAULT_EXPERT_MODEL_IDS,
+      useLongTermMemory:
+        typeof conversation.settings?.useLongTermMemory === 'boolean'
+          ? conversation.settings.useLongTermMemory
+          : true,
+      includeDocuments:
+        typeof conversation.settings?.includeDocuments === 'boolean'
+          ? conversation.settings.includeDocuments
+          : true,
+    },
+  };
+}
+
 function createEmptyConversation(): StudioConversation {
   const now = Date.now();
 
@@ -469,26 +548,50 @@ export default function ChatStudio() {
     let isMounted = true;
 
     const loadStudioState = async () => {
-      const [storedConversations, storedActiveConversationId] = await Promise.all([
-        loadStudioConversations(),
-        loadActiveStudioConversationId(),
-      ]);
+      try {
+        const [storedConversations, storedActiveConversationId] = await Promise.all([
+          loadStudioConversations(),
+          loadActiveStudioConversationId(),
+        ]);
 
-      if (!isMounted) {
-        return;
-      }
+        if (!isMounted) {
+          return;
+        }
 
-      if (storedConversations.length === 0) {
+        const normalizedConversations = storedConversations
+          .filter((conversation) => conversation && typeof conversation === 'object')
+          .map((conversation) => normalizeStudioConversation(conversation));
+
+        if (normalizedConversations.length === 0) {
+          const initialConversation = createEmptyConversation();
+          setConversations([initialConversation]);
+          setActiveConversationId(initialConversation.id);
+          setIsHydrated(true);
+          return;
+        }
+
+        const resolvedActiveConversationId = normalizedConversations.some(
+          (conversation) => conversation.id === storedActiveConversationId
+        )
+          ? storedActiveConversationId
+          : normalizedConversations[0].id;
+
+        setConversations(normalizedConversations);
+        setActiveConversationId(resolvedActiveConversationId);
+        setIsHydrated(true);
+      } catch (error) {
+        console.error('Failed to initialize Chat Studio state:', error);
+
+        if (!isMounted) {
+          return;
+        }
+
         const initialConversation = createEmptyConversation();
         setConversations([initialConversation]);
         setActiveConversationId(initialConversation.id);
+        setError('已自動回復 Chat Studio 狀態，若先前資料異常可重新建立對話。');
         setIsHydrated(true);
-        return;
       }
-
-      setConversations(storedConversations);
-      setActiveConversationId(storedActiveConversationId || storedConversations[0].id);
-      setIsHydrated(true);
     };
 
     void loadStudioState();
@@ -518,6 +621,16 @@ export default function ChatStudio() {
 
     void saveActiveStudioConversationId(activeConversationId);
   }, [activeConversationId, isHydrated]);
+
+  useEffect(() => {
+    if (!isHydrated || conversations.length === 0) {
+      return;
+    }
+
+    if (!activeConversationId || !conversations.some((conversation) => conversation.id === activeConversationId)) {
+      setActiveConversationId(conversations[0].id);
+    }
+  }, [activeConversationId, conversations, isHydrated]);
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) || null,
@@ -562,21 +675,25 @@ export default function ChatStudio() {
   };
 
   const deleteConversation = (conversationId: string) => {
-    setConversations((current) => {
-      const nextConversations = current.filter((conversation) => conversation.id !== conversationId);
+    const nextConversations = conversations.filter((conversation) => conversation.id !== conversationId);
 
-      if (nextConversations.length === 0) {
-        const replacement = createEmptyConversation();
-        setActiveConversationId(replacement.id);
-        return [replacement];
-      }
+    if (nextConversations.length === 0) {
+      const replacement = createEmptyConversation();
+      setConversations([replacement]);
+      setActiveConversationId(replacement.id);
+      setDraft('');
+      setError(null);
+      return;
+    }
 
-      if (activeConversationId === conversationId) {
-        setActiveConversationId(nextConversations[0].id);
-      }
+    setConversations(nextConversations);
 
-      return nextConversations;
-    });
+    if (activeConversationId === conversationId) {
+      setActiveConversationId(nextConversations[0].id);
+    }
+
+    setDraft('');
+    setError(null);
   };
 
   const handleDocumentUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -831,7 +948,13 @@ export default function ChatStudio() {
   };
 
   if (!activeConversation) {
-    return null;
+    return (
+      <div className="page-shell flex h-screen items-center justify-center px-6 py-6">
+        <div className="marble-card rounded-[1.75rem] px-6 py-5 text-center">
+          <div className="text-sm text-[var(--slate-500)]">Chat Studio 正在恢復對話狀態...</div>
+        </div>
+      </div>
+    );
   }
 
   const isConversationEmpty = activeConversation.messages.length === 0;

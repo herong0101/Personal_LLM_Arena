@@ -40,7 +40,9 @@ export default function ModelSelection() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const availableModels = AVAILABLE_MODELS.filter((m) => m.available);
+  const availableModels = AVAILABLE_MODELS.filter(
+    (model) => model.available && model.capabilities?.includes('chat')
+  );
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const modeDescription =
     state.arenaMode === 'blind'

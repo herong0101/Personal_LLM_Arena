@@ -5,16 +5,22 @@ import { AzureOpenAI } from 'openai';
 const DEFAULT_AZURE_OPENAI_ENDPOINT = 'https://9n00400.openai.azure.com/';
 const DEFAULT_AZURE_OPENAI_DEPLOYMENT = 'gpt-5.2';
 const DEFAULT_AZURE_OPENAI_API_VERSION = '2024-12-01-preview';
+const PROJECT_04_AZURE_OPENAI_ENDPOINT = 'https://project-04-openai-service.openai.azure.com/';
+const PROJECT_04_AZURE_OPENAI_API_VERSION = '2025-04-01-preview';
+const PROJECT_04_AZURE_OPENAI_GPT_54_DEPLOYMENT = 'project-04-gpt-5.4';
+const PROJECT_04_AZURE_OPENAI_GPT_54_PRO_DEPLOYMENT = 'project-04-gpt-5.4-pro';
 
 const DEFAULT_ANTHROPIC_BASE_URL =
   'https://project3-docai-resource.services.ai.azure.com/anthropic/';
 const DEFAULT_ANTHROPIC_DEPLOYMENT = 'claude-opus-4-5';
+const SONNET_46_ANTHROPIC_BASE_URL = 'https://9h00200-act-aifoundry.openai.azure.com/anthropic/';
+const SONNET_46_ANTHROPIC_DEPLOYMENT = 'project-04-claude-sonnet-4-6';
 const LOCAL_OLLAMA_4090_API_URL = 'http://10.61.16.31:11434/api';
 const LOCAL_OLLAMA_5090_API_URL = 'http://10.61.16.119:11434/api';
 const LOCAL_VLLM_4090_API_URL = 'http://10.61.16.101:8000';
 
 const ARENA_SYSTEM_PROMPT =
-  '請一律使用繁體中文回答。不要輸出表格、Markdown 語法或簡體中文，且回答清晰簡潔。';
+  '請一律使用繁體中文回答。不要輸出表格、Markdown 語法或簡體中文，且回答清晰簡潔。只輸出最終答案，不要輸出思考過程、推理步驟、內部提示、thought、thinking、<think>、<unused> 或任何類似標記。';
 
 const DEFAULT_RESPONSE_TOKEN_LIMIT = 4096;
 const DEFAULT_TEMPERATURE = 0.3;
@@ -34,6 +40,20 @@ interface GeneratedImagePayload {
 interface ImageGenerationResponse {
   response: string;
   images: GeneratedImagePayload[];
+}
+
+interface AzureOpenAIModelConfig {
+  endpoint: string;
+  deployment: string;
+  apiVersion: string;
+  apiKeyEnvNames: string[];
+  requestMode: 'chat-completions' | 'responses';
+}
+
+interface AnthropicModelConfig {
+  baseUrl: string;
+  deployment: string;
+  apiKeyEnvNames: string[];
 }
 
 type LocalRuntimeConfig =
@@ -108,6 +128,52 @@ const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
   },
 };
 
+const AZURE_OPENAI_MODEL_CONFIGS: Record<string, AzureOpenAIModelConfig> = {
+  'gpt-5.2': {
+    endpoint: DEFAULT_AZURE_OPENAI_ENDPOINT,
+    deployment: DEFAULT_AZURE_OPENAI_DEPLOYMENT,
+    apiVersion: DEFAULT_AZURE_OPENAI_API_VERSION,
+    apiKeyEnvNames: ['AZURE_OPENAI_API_KEY', '5.2_AZURE_OPENAI_API_KEY'],
+    requestMode: 'chat-completions',
+  },
+  'gpt-5.4': {
+    endpoint: PROJECT_04_AZURE_OPENAI_ENDPOINT,
+    deployment: PROJECT_04_AZURE_OPENAI_GPT_54_DEPLOYMENT,
+    apiVersion: PROJECT_04_AZURE_OPENAI_API_VERSION,
+    apiKeyEnvNames: ['5.4_AZURE_OPENAI_API_KEY', '5.4_PRO_AZURE_OPENAI_API_KEY', '5.4_pro_AZURE_OPENAI_API_KEY'],
+    requestMode: 'responses',
+  },
+  'gpt-5.4-pro': {
+    endpoint: PROJECT_04_AZURE_OPENAI_ENDPOINT,
+    deployment: PROJECT_04_AZURE_OPENAI_GPT_54_PRO_DEPLOYMENT,
+    apiVersion: PROJECT_04_AZURE_OPENAI_API_VERSION,
+    apiKeyEnvNames: ['5.4_PRO_AZURE_OPENAI_API_KEY', '5.4_pro_AZURE_OPENAI_API_KEY', '5.4_AZURE_OPENAI_API_KEY'],
+    requestMode: 'responses',
+  },
+};
+
+const ANTHROPIC_MODEL_CONFIGS: Record<string, AnthropicModelConfig> = {
+  'claude-opus-4-5': {
+    baseUrl: DEFAULT_ANTHROPIC_BASE_URL,
+    deployment: DEFAULT_ANTHROPIC_DEPLOYMENT,
+    apiKeyEnvNames: [
+      'AZURE_OPUS_4.5_API_KEY',
+      'AZURE_OPUS_4_5_API_KEY',
+      'AZURE_ANTHROPIC_API_KEY',
+      'ANTHROPIC_FOUNDRY_API_KEY',
+    ],
+  },
+  'claude-sonnet-4-6': {
+    baseUrl: SONNET_46_ANTHROPIC_BASE_URL,
+    deployment: SONNET_46_ANTHROPIC_DEPLOYMENT,
+    apiKeyEnvNames: [
+      'AZURE_SONNET_4.6_API_KEY',
+      'AZURE_SONNET_4_6_API_KEY',
+      'ANTHROPIC_FOUNDRY_API_KEY',
+    ],
+  },
+};
+
 function requireEnv(nameCandidates: string[]): string {
   for (const name of nameCandidates) {
     const value = process.env[name];
@@ -123,8 +189,66 @@ function ensureTrailingSlash(value: string): string {
   return value.endsWith('/') ? value : `${value}/`;
 }
 
+function extractOpenAIResponsesText(response: { output_text?: string; output?: unknown[] }): string {
+  if (typeof response.output_text === 'string' && response.output_text.trim()) {
+    return response.output_text.trim();
+  }
+
+  if (!Array.isArray(response.output)) {
+    return '';
+  }
+
+  return response.output
+    .flatMap((item) => {
+      if (typeof item !== 'object' || item === null || !('content' in item) || !Array.isArray(item.content)) {
+        return [] as string[];
+      }
+
+      return item.content.flatMap((contentItem) => {
+        if (
+          typeof contentItem !== 'object' ||
+          contentItem === null ||
+          !('type' in contentItem) ||
+          contentItem.type !== 'output_text' ||
+          !('text' in contentItem) ||
+          typeof contentItem.text !== 'string'
+        ) {
+          return [] as string[];
+        }
+
+        const text = contentItem.text.trim();
+        return text ? [text] : [];
+      });
+    })
+    .join('\n\n')
+    .trim();
+}
+
 function buildSystemPrompt(systemPrompt?: string): string {
   return systemPrompt ? `${ARENA_SYSTEM_PROMPT}\n\n${systemPrompt}` : ARENA_SYSTEM_PROMPT;
+}
+
+function sanitizeModelResponse(rawText: string): string {
+  const originalText = rawText.trim();
+
+  if (!originalText) {
+    return originalText;
+  }
+
+  let sanitizedText = originalText
+    .replace(/<\s*think\s*>[\s\S]*?<\s*\/think\s*>/gi, '')
+    .replace(/<\s*thinking\s*>[\s\S]*?<\s*\/thinking\s*>/gi, '')
+    .trim();
+
+  const unusedThoughtMatch = sanitizedText.match(/^<unused\d+>\s*thought\b[\s\S]*?<unused\d+>([\s\S]*)$/i);
+
+  if (unusedThoughtMatch?.[1]) {
+    sanitizedText = unusedThoughtMatch[1].trim();
+  }
+
+  sanitizedText = sanitizedText.replace(/<unused\d+>/gi, '').trim();
+
+  return sanitizedText || originalText;
 }
 
 function resolveResponseTokenLimit(responseTokenLimit?: number): number {
@@ -227,11 +351,21 @@ function extractGeminiImageResponse(data: unknown): ImageGenerationResponse {
   };
 }
 
-async function handleOpenAI(prompt: string, options: ProviderRequestOptions): Promise<string> {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT || DEFAULT_AZURE_OPENAI_ENDPOINT;
-  const apiKey = requireEnv(['AZURE_OPENAI_API_KEY', '5.2_AZURE_OPENAI_API_KEY']);
-  const apiVersion = process.env.AZURE_OPENAI_API_VERSION || DEFAULT_AZURE_OPENAI_API_VERSION;
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || DEFAULT_AZURE_OPENAI_DEPLOYMENT;
+async function handleOpenAI(
+  prompt: string,
+  modelId: string,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const modelConfig = AZURE_OPENAI_MODEL_CONFIGS[modelId];
+
+  if (!modelConfig) {
+    throw new Error(`Unsupported Azure OpenAI model: ${modelId}`);
+  }
+
+  const endpoint = modelConfig.endpoint;
+  const apiKey = requireEnv(modelConfig.apiKeyEnvNames);
+  const apiVersion = modelConfig.apiVersion;
+  const deployment = modelConfig.deployment;
   const systemPrompt = buildSystemPrompt(options.systemPrompt);
   const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
   const temperature = resolveTemperature(options.temperature);
@@ -241,6 +375,17 @@ async function handleOpenAI(prompt: string, options: ProviderRequestOptions): Pr
     apiKey,
     apiVersion,
   });
+
+  if (modelConfig.requestMode === 'responses') {
+    const response = await client.responses.create({
+      model: deployment,
+      instructions: systemPrompt,
+      input: prompt,
+      max_output_tokens: responseTokenLimit,
+    });
+
+    return extractOpenAIResponsesText(response);
+  }
 
   const response = await client.chat.completions.create({
     model: deployment,
@@ -333,14 +478,20 @@ async function handleGeminiImage(
   return parsed;
 }
 
-async function handleAnthropic(prompt: string, options: ProviderRequestOptions): Promise<string> {
-  const baseUrl = ensureTrailingSlash(
-    process.env.AZURE_ANTHROPIC_BASE_URL ||
-      process.env.ANTHROPIC_FOUNDRY_BASE_URL ||
-      DEFAULT_ANTHROPIC_BASE_URL
-  );
-  const apiKey = requireEnv(['AZURE_ANTHROPIC_API_KEY', 'ANTHROPIC_FOUNDRY_API_KEY']);
-  const deployment = process.env.AZURE_ANTHROPIC_DEPLOYMENT || DEFAULT_ANTHROPIC_DEPLOYMENT;
+async function handleAnthropic(
+  prompt: string,
+  modelId: string,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const modelConfig = ANTHROPIC_MODEL_CONFIGS[modelId];
+
+  if (!modelConfig) {
+    throw new Error(`Unsupported Anthropic model: ${modelId}`);
+  }
+
+  const baseUrl = ensureTrailingSlash(modelConfig.baseUrl);
+  const apiKey = requireEnv(modelConfig.apiKeyEnvNames);
+  const deployment = modelConfig.deployment;
   const systemPrompt = buildSystemPrompt(options.systemPrompt);
   const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
   const temperature = resolveTemperature(options.temperature);
@@ -507,7 +658,9 @@ export async function POST(request: NextRequest) {
 
     switch (modelId) {
       case 'gpt-5.2':
-        response = await handleOpenAI(prompt, options);
+      case 'gpt-5.4':
+      case 'gpt-5.4-pro':
+        response = await handleOpenAI(prompt, modelId, options);
         break;
       case 'gemini-2.5-pro':
       case 'gemini-2.5-flash':
@@ -521,7 +674,8 @@ export async function POST(request: NextRequest) {
         imageResponse = await handleGeminiImage(prompt, modelId, options);
         break;
       case 'claude-opus-4-5':
-        response = await handleAnthropic(prompt, options);
+      case 'claude-sonnet-4-6':
+        response = await handleAnthropic(prompt, modelId, options);
         break;
       default:
         if (modelId in LOCAL_MODEL_CONFIGS) {
@@ -534,6 +688,10 @@ export async function POST(request: NextRequest) {
 
     if (imageResponse) {
       return NextResponse.json(imageResponse);
+    }
+
+    if (typeof response === 'string') {
+      response = sanitizeModelResponse(response);
     }
 
     return NextResponse.json({ response });
