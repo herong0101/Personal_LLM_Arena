@@ -2,6 +2,9 @@
 export type ArenaMode = 'blind' | 'open';
 export type ModelSource = 'cloud' | 'local';
 export type ModelSpeed = 'fast' | 'medium' | 'slow';
+export type ModelCapability = 'chat' | 'document' | 'reasoning' | 'expert' | 'memory' | 'image';
+export type StudioMode = 'chat' | 'reasoning' | 'expert' | 'image';
+export type StudioRole = 'user' | 'assistant' | 'system';
 
 // Model types
 export interface AIModel {
@@ -13,6 +16,7 @@ export interface AIModel {
   source?: ModelSource;
   speed?: ModelSpeed;
   serverLabel?: string;
+  capabilities?: ModelCapability[];
 }
 
 // Response from model
@@ -130,4 +134,54 @@ export interface AnonymousRankingData {
   modelIds: string[];
   ranks: number[];
   timestamp: number;
+}
+
+export interface StudioMessage {
+  id: string;
+  role: StudioRole;
+  content: string;
+  createdAt: number;
+  modelId?: string;
+  label?: string;
+  images?: StudioGeneratedImage[];
+}
+
+export interface StudioGeneratedImage {
+  id: string;
+  mimeType: string;
+  base64Data: string;
+}
+
+export interface StudioDocument {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  content: string;
+  createdAt: number;
+}
+
+export interface StudioMemory {
+  summary: string;
+  updatedAt?: number;
+  sourceMessageCount: number;
+}
+
+export interface StudioConversationSettings {
+  activeModelId: string;
+  mode: StudioMode;
+  expertModelIds: string[];
+  useLongTermMemory: boolean;
+  includeDocuments: boolean;
+}
+
+export interface StudioConversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: StudioMessage[];
+  documents: StudioDocument[];
+  memory: StudioMemory;
+  settings: StudioConversationSettings;
 }

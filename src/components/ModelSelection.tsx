@@ -11,7 +11,7 @@ const QUICK_PRESETS = [
   {
     label: '雲端基準組',
     description: '用主流雲端模型快速建立基準線。',
-    modelIds: ['gpt-5.2', 'gemini-2.5-pro', 'claude-opus-4-5'],
+    modelIds: ['gpt-5.2', 'gemini-3.1-pro-preview', 'claude-opus-4-5'],
   },
   {
     label: '地端快速組',
@@ -28,7 +28,7 @@ const QUICK_PRESETS = [
     modelIds: [
       'local-ollama-5090-medgemma-1.5-4b',
       'local-ollama-4090-medgemma-1.5-4b',
-      'gpt-5.2',
+      'claude-opus-4-5',
     ],
   },
 ];
@@ -45,7 +45,7 @@ export default function ModelSelection() {
   const modeDescription =
     state.arenaMode === 'blind'
       ? '回答會先匿名顯示，送出排名後才揭露模型身份。'
-      : '回答會直接顯示模型名稱，方便明牌比較。';
+      : '回答會直接顯示模型名稱，方便比較。';
 
   const filteredModels = useMemo(() => {
     const keyword = deferredSearchQuery.trim().toLowerCase();
@@ -134,7 +134,6 @@ export default function ModelSelection() {
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--slate-600)] sm:text-lg">
                 先挑出 1 到 {ARENA_CONFIG.maxModelsPerRound} 個模型開始對戰。
-                我把入口拆成推薦組合、篩選和搜尋，讓你不用先讀完整個清單才能開始。
               </p>
               <p className="mt-2 text-sm text-[var(--slate-500)]">{modeDescription}</p>
             </div>
@@ -158,7 +157,7 @@ export default function ModelSelection() {
             </div>
             <p className="mt-4 text-sm leading-7 text-[var(--slate-600)]">
               已選 {selectedModels.length} / {ARENA_CONFIG.maxModelsPerRound}。
-              盲測時建議先選風格差異明顯的組合，比較更有辨識度。
+              盲測時建議先選定位差不多的模型，比較更有意義。
             </p>
           </div>
         </div>
@@ -230,7 +229,7 @@ export default function ModelSelection() {
 
           <div className="mb-6 flex flex-wrap gap-3 text-sm text-[var(--slate-500)]">
             <span className="rounded-full bg-[rgba(24,172,126,0.1)] px-3 py-1 text-[var(--emerald-700)]">盲測建議：至少 2 個模型</span>
-            <span className="rounded-full bg-white/70 px-3 py-1">公開比較適合快速 benchmark</span>
+            <span className="rounded-full bg-white/70 px-3 py-1">公開比較適合快速測試比較</span>
             <span className="rounded-full bg-white/70 px-3 py-1">地端模型可依速度標記先行篩選</span>
           </div>
 

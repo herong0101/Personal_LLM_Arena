@@ -3,8 +3,8 @@ import { ArenaProvider } from '@/context/ArenaContext';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '智力競技場 | Arena of Intelligence',
-  description: '以盲測或非盲測方式比較真實 AI 模型，並匯出對戰結果與回饋。',
+  title: '語言模型體驗平台 | Arena of Intelligence',
+  description: '整合模型競技場、長對話、使用者端記憶與多模型協作的語言模型體驗平台。',
 };
 
 export default function RootLayout({

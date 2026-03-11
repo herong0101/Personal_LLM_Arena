@@ -14,7 +14,27 @@ const LOCAL_OLLAMA_5090_API_URL = 'http://10.61.16.119:11434/api';
 const LOCAL_VLLM_4090_API_URL = 'http://10.61.16.101:8000';
 
 const ARENA_SYSTEM_PROMPT =
-  '請一律使用繁體中文回答。不要輸出表格、Markdown 語法或簡體中文，並讓內容盡量精簡。';
+  '請一律使用繁體中文回答。不要輸出表格、Markdown 語法或簡體中文，且回答清晰簡潔。';
+
+const DEFAULT_RESPONSE_TOKEN_LIMIT = 4096;
+const DEFAULT_TEMPERATURE = 0.3;
+const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+interface ProviderRequestOptions {
+  systemPrompt?: string;
+  responseTokenLimit?: number;
+  temperature?: number;
+}
+
+interface GeneratedImagePayload {
+  mimeType: string;
+  data: string;
+}
+
+interface ImageGenerationResponse {
+  response: string;
+  images: GeneratedImagePayload[];
+}
 
 type LocalRuntimeConfig =
   | { kind: 'ollama'; apiUrl: string; model: string }
@@ -103,6 +123,26 @@ function ensureTrailingSlash(value: string): string {
   return value.endsWith('/') ? value : `${value}/`;
 }
 
+function buildSystemPrompt(systemPrompt?: string): string {
+  return systemPrompt ? `${ARENA_SYSTEM_PROMPT}\n\n${systemPrompt}` : ARENA_SYSTEM_PROMPT;
+}
+
+function resolveResponseTokenLimit(responseTokenLimit?: number): number {
+  if (typeof responseTokenLimit !== 'number' || Number.isNaN(responseTokenLimit)) {
+    return DEFAULT_RESPONSE_TOKEN_LIMIT;
+  }
+
+  return Math.max(256, Math.min(DEFAULT_RESPONSE_TOKEN_LIMIT, Math.floor(responseTokenLimit)));
+}
+
+function resolveTemperature(temperature?: number): number {
+  if (typeof temperature !== 'number' || Number.isNaN(temperature)) {
+    return DEFAULT_TEMPERATURE;
+  }
+
+  return Math.min(1, Math.max(0, temperature));
+}
+
 function extractAnthropicText(content: unknown): string {
   if (!Array.isArray(content)) {
     return '';
@@ -119,11 +159,82 @@ function extractAnthropicText(content: unknown): string {
     .trim();
 }
 
-async function handleOpenAI(prompt: string): Promise<string> {
+function extractGeminiImageResponse(data: unknown): ImageGenerationResponse {
+  const candidates =
+    typeof data === 'object' && data !== null && 'candidates' in data && Array.isArray(data.candidates)
+      ? data.candidates
+      : [];
+  const parts: unknown[] =
+    candidates.length > 0 &&
+    typeof candidates[0] === 'object' &&
+    candidates[0] !== null &&
+    'content' in candidates[0] &&
+    typeof candidates[0].content === 'object' &&
+    candidates[0].content !== null &&
+    'parts' in candidates[0].content &&
+    Array.isArray(candidates[0].content.parts)
+      ? candidates[0].content.parts
+      : [];
+
+  const response = parts
+    .filter(
+      (part: unknown): part is { text?: string } =>
+        typeof part === 'object' && part !== null && 'text' in part && typeof part.text === 'string'
+    )
+    .map((part: { text?: string }) => part.text?.trim() ?? '')
+    .filter(Boolean)
+    .join('\n\n');
+
+  const images = parts
+    .map((part: unknown) => {
+      if (typeof part !== 'object' || part === null) {
+        return null;
+      }
+
+      const inlineData =
+        'inlineData' in part && typeof part.inlineData === 'object' && part.inlineData !== null
+          ? part.inlineData
+          : 'inline_data' in part && typeof part.inline_data === 'object' && part.inline_data !== null
+            ? part.inline_data
+            : null;
+
+      if (!inlineData) {
+        return null;
+      }
+
+      const mimeType =
+        'mimeType' in inlineData && typeof inlineData.mimeType === 'string'
+          ? inlineData.mimeType
+          : 'mime_type' in inlineData && typeof inlineData.mime_type === 'string'
+            ? inlineData.mime_type
+            : null;
+      const imageData = 'data' in inlineData && typeof inlineData.data === 'string' ? inlineData.data : null;
+
+      if (!mimeType || !imageData) {
+        return null;
+      }
+
+      return {
+        mimeType,
+        data: imageData,
+      };
+    })
+    .filter((item: GeneratedImagePayload | null): item is GeneratedImagePayload => item !== null);
+
+  return {
+    response,
+    images,
+  };
+}
+
+async function handleOpenAI(prompt: string, options: ProviderRequestOptions): Promise<string> {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT || DEFAULT_AZURE_OPENAI_ENDPOINT;
   const apiKey = requireEnv(['AZURE_OPENAI_API_KEY', '5.2_AZURE_OPENAI_API_KEY']);
   const apiVersion = process.env.AZURE_OPENAI_API_VERSION || DEFAULT_AZURE_OPENAI_API_VERSION;
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || DEFAULT_AZURE_OPENAI_DEPLOYMENT;
+  const systemPrompt = buildSystemPrompt(options.systemPrompt);
+  const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
+  const temperature = resolveTemperature(options.temperature);
 
   const client = new AzureOpenAI({
     endpoint,
@@ -136,32 +247,93 @@ async function handleOpenAI(prompt: string): Promise<string> {
     messages: [
       {
         role: 'system',
-        content: ARENA_SYSTEM_PROMPT,
+        content: systemPrompt,
       },
       {
         role: 'user',
         content: prompt,
       },
     ],
-    max_completion_tokens: 16384,
+    max_completion_tokens: responseTokenLimit,
+    temperature,
   });
 
   return response.choices[0]?.message?.content ?? '';
 }
 
-async function handleGemini(prompt: string, modelId: string): Promise<string> {
+async function handleGemini(prompt: string, modelId: string, options: ProviderRequestOptions): Promise<string> {
   const apiKey = requireEnv(['GEMINI_API_KEY']);
   const genAI = new GoogleGenerativeAI(apiKey);
+  const systemPrompt = buildSystemPrompt(options.systemPrompt);
+  const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
+  const temperature = resolveTemperature(options.temperature);
   const model = genAI.getGenerativeModel({
     model: modelId,
-    systemInstruction: ARENA_SYSTEM_PROMPT,
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      maxOutputTokens: responseTokenLimit,
+      temperature,
+    },
   });
 
   const result = await model.generateContent(prompt);
   return result.response.text();
 }
 
-async function handleAnthropic(prompt: string): Promise<string> {
+async function handleGeminiImage(
+  prompt: string,
+  modelId: string,
+  options: ProviderRequestOptions
+): Promise<ImageGenerationResponse> {
+  const apiKey = requireEnv(['GEMINI_API_KEY']);
+  const systemPrompt = buildSystemPrompt(options.systemPrompt);
+  const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
+  const temperature = resolveTemperature(options.temperature);
+
+  const response = await fetch(
+    `${GEMINI_API_BASE_URL}/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
+        },
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+          temperature,
+          maxOutputTokens: responseTokenLimit,
+          imageConfig: {
+            aspectRatio: '1:1',
+          },
+        },
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error?.message || data.error || 'Gemini image request failed');
+  }
+
+  const parsed = extractGeminiImageResponse(data);
+
+  if (parsed.images.length === 0) {
+    throw new Error('Gemini image response did not contain image content');
+  }
+
+  return parsed;
+}
+
+async function handleAnthropic(prompt: string, options: ProviderRequestOptions): Promise<string> {
   const baseUrl = ensureTrailingSlash(
     process.env.AZURE_ANTHROPIC_BASE_URL ||
       process.env.ANTHROPIC_FOUNDRY_BASE_URL ||
@@ -169,6 +341,9 @@ async function handleAnthropic(prompt: string): Promise<string> {
   );
   const apiKey = requireEnv(['AZURE_ANTHROPIC_API_KEY', 'ANTHROPIC_FOUNDRY_API_KEY']);
   const deployment = process.env.AZURE_ANTHROPIC_DEPLOYMENT || DEFAULT_ANTHROPIC_DEPLOYMENT;
+  const systemPrompt = buildSystemPrompt(options.systemPrompt);
+  const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
+  const temperature = resolveTemperature(options.temperature);
 
   const response = await fetch(new URL('v1/messages', baseUrl), {
     method: 'POST',
@@ -179,9 +354,10 @@ async function handleAnthropic(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: deployment,
-      system: ARENA_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1024,
+      max_tokens: responseTokenLimit,
+      temperature,
     }),
   });
 
@@ -200,7 +376,15 @@ async function handleAnthropic(prompt: string): Promise<string> {
   return text;
 }
 
-async function handleLocalOllama(prompt: string, config: Extract<LocalRuntimeConfig, { kind: 'ollama' }>): Promise<string> {
+async function handleLocalOllama(
+  prompt: string,
+  config: Extract<LocalRuntimeConfig, { kind: 'ollama' }>,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const systemPrompt = buildSystemPrompt(options.systemPrompt);
+  const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
+  const temperature = resolveTemperature(options.temperature);
+
   const response = await fetch(new URL('generate', ensureTrailingSlash(config.apiUrl)), {
     method: 'POST',
     headers: {
@@ -209,10 +393,11 @@ async function handleLocalOllama(prompt: string, config: Extract<LocalRuntimeCon
     body: JSON.stringify({
       model: config.model,
       prompt,
-      system: ARENA_SYSTEM_PROMPT,
+      system: systemPrompt,
       stream: false,
       options: {
-        num_predict: 512,
+        num_predict: responseTokenLimit,
+        temperature,
       },
     }),
   });
@@ -232,7 +417,15 @@ async function handleLocalOllama(prompt: string, config: Extract<LocalRuntimeCon
   return text;
 }
 
-async function handleLocalVllm(prompt: string, config: Extract<LocalRuntimeConfig, { kind: 'vllm' }>): Promise<string> {
+async function handleLocalVllm(
+  prompt: string,
+  config: Extract<LocalRuntimeConfig, { kind: 'vllm' }>,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const systemPrompt = buildSystemPrompt(options.systemPrompt);
+  const responseTokenLimit = resolveResponseTokenLimit(options.responseTokenLimit);
+  const temperature = resolveTemperature(options.temperature);
+
   const response = await fetch(new URL('v1/chat/completions', ensureTrailingSlash(config.apiUrl)), {
     method: 'POST',
     headers: {
@@ -243,15 +436,15 @@ async function handleLocalVllm(prompt: string, config: Extract<LocalRuntimeConfi
       messages: [
         {
           role: 'system',
-          content: ARENA_SYSTEM_PROMPT,
+          content: systemPrompt,
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      max_tokens: 512,
-      temperature: 0.3,
+      max_tokens: responseTokenLimit,
+      temperature,
       stream: false,
     }),
   });
@@ -271,7 +464,7 @@ async function handleLocalVllm(prompt: string, config: Extract<LocalRuntimeConfi
   return text;
 }
 
-async function handleLocalModel(prompt: string, modelId: string): Promise<string> {
+async function handleLocalModel(prompt: string, modelId: string, options: ProviderRequestOptions): Promise<string> {
   const config = LOCAL_MODEL_CONFIGS[modelId];
 
   if (!config) {
@@ -279,15 +472,22 @@ async function handleLocalModel(prompt: string, modelId: string): Promise<string
   }
 
   if (config.kind === 'ollama') {
-    return handleLocalOllama(prompt, config);
+    return handleLocalOllama(prompt, config, options);
   }
 
-  return handleLocalVllm(prompt, config);
+  return handleLocalVllm(prompt, config, options);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { modelId, prompt } = (await request.json()) as { modelId?: string; prompt?: string };
+    const { modelId, prompt, systemPrompt, responseTokenLimit, temperature } =
+      (await request.json()) as {
+        modelId?: string;
+        prompt?: string;
+        systemPrompt?: string;
+        responseTokenLimit?: number;
+        temperature?: number;
+      };
 
     if (!prompt || !modelId) {
       return NextResponse.json(
@@ -296,11 +496,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let response: string;
+    const options: ProviderRequestOptions = {
+      systemPrompt,
+      responseTokenLimit,
+      temperature,
+    };
+
+    let response: string | undefined;
+    let imageResponse: ImageGenerationResponse | null = null;
 
     switch (modelId) {
       case 'gpt-5.2':
-        response = await handleOpenAI(prompt);
+        response = await handleOpenAI(prompt, options);
         break;
       case 'gemini-2.5-pro':
       case 'gemini-2.5-flash':
@@ -308,18 +515,25 @@ export async function POST(request: NextRequest) {
       case 'gemini-3-pro-preview':
       case 'gemini-3.1-pro-preview':
       case 'gemini-3.1-flash-lite-preview':
-        response = await handleGemini(prompt, modelId);
+        response = await handleGemini(prompt, modelId, options);
+        break;
+      case 'gemini-3.1-flash-image-preview':
+        imageResponse = await handleGeminiImage(prompt, modelId, options);
         break;
       case 'claude-opus-4-5':
-        response = await handleAnthropic(prompt);
+        response = await handleAnthropic(prompt, options);
         break;
       default:
         if (modelId in LOCAL_MODEL_CONFIGS) {
-          response = await handleLocalModel(prompt, modelId);
+          response = await handleLocalModel(prompt, modelId, options);
           break;
         }
 
         return NextResponse.json({ error: `Unsupported model: ${modelId}` }, { status: 400 });
+    }
+
+    if (imageResponse) {
+      return NextResponse.json(imageResponse);
     }
 
     return NextResponse.json({ response });

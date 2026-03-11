@@ -6,7 +6,7 @@ import { ArenaMode } from '@/types';
 
 const HERO_STATS = [
   { label: '比較方式', value: '盲測與公開雙模式' },
-  { label: '對戰節奏', value: '每局 1 題，立即排名' },
+  { label: '對戰節奏', value: '即刻測試，立即排名' },
   { label: '結果處理', value: '留下紀錄' },
 ];
 

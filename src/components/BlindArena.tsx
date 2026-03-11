@@ -42,6 +42,7 @@ export default function BlindArena() {
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState<Record<string, string>>({});
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const { arenaMode, currentResponses, isLoading, selectedModels, session } = state;
   const isBlindMode = arenaMode === 'blind';
@@ -192,12 +193,14 @@ export default function BlindArena() {
           onSelectRound={setSelectedRoundId}
           isMobileOpen={isHistoryOpen}
           onCloseMobile={() => setIsHistoryOpen(false)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
         />
 
         <main className="flex min-h-screen flex-1 flex-col lg:h-screen">
-          <header className="border-b border-[var(--border-soft)] bg-[rgba(255,251,245,0.78)] px-4 py-4 backdrop-blur-xl sm:px-6">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-              <div className="flex flex-col gap-4">
+          <header className="border-b border-[var(--border-soft)] bg-[rgba(255,251,245,0.72)] px-4 py-3 backdrop-blur-xl sm:px-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
@@ -223,15 +226,15 @@ export default function BlindArena() {
 
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="font-serif text-3xl font-semibold text-[var(--slate-900)]">
+                    <h1 className="font-serif text-[1.9rem] font-semibold text-[var(--slate-900)]">
                       {isBlindMode ? '盲測競技場' : '公開競技場'}
                     </h1>
                     <div className="rounded-full bg-[rgba(24,172,126,0.1)] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[var(--emerald-700)]">
                       {ARENA_MODE_LABELS[arenaMode]}
                     </div>
                   </div>
-                  <p className="mt-2 text-sm leading-7 text-[var(--slate-600)]">
-                    同一題、同一時間、同一流程比較模型表現。
+                  <p className="mt-1 text-sm leading-6 text-[var(--slate-600)]">
+                    同一問題比較模型表現。
                     {isBlindMode ? ' 送出排名後才揭曉模型身份。' : ' 目前直接顯示模型名稱。'}
                   </p>
                 </div>
@@ -240,7 +243,7 @@ export default function BlindArena() {
                   {selectedModels.map((model) => (
                     <span
                       key={model.id}
-                      className="rounded-full bg-white/78 px-3 py-2 text-sm text-[var(--slate-700)]"
+                      className="rounded-full bg-white/78 px-3 py-1.5 text-xs font-medium text-[var(--slate-700)]"
                     >
                       {model.name}
                     </span>
@@ -248,16 +251,16 @@ export default function BlindArena() {
                 </div>
               </div>
 
-              <div className="space-y-4 xl:max-w-md xl:text-right">
-                <div className="flex items-center gap-3 xl:justify-end">
-                  <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--slate-600)]">
+              <div className="space-y-3 xl:max-w-md xl:text-right">
+                <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                  <div className="rounded-2xl bg-white/80 px-3 py-2 text-sm text-[var(--slate-600)]">
                     第 <span className="font-semibold text-[var(--emerald-700)]">{roundCount + 1}</span> / {ARENA_CONFIG.maxRoundsPerSession} 局
                   </div>
                   {isCompletedSession ? (
                     <button
                       type="button"
                       onClick={() => dispatch({ type: 'SET_PHASE', payload: 'analytics' })}
-                      className="soft-button rounded-2xl px-4 py-3 text-sm font-medium"
+                      className="soft-button rounded-2xl px-3 py-2 text-sm font-medium"
                     >
                       返回送出頁
                     </button>
@@ -265,7 +268,7 @@ export default function BlindArena() {
                     <button
                       type="button"
                       onClick={endSession}
-                      className="rounded-2xl border border-[rgba(213,109,85,0.22)] bg-white/78 px-4 py-3 text-sm font-medium text-[var(--slate-600)] transition-colors hover:border-[rgba(213,109,85,0.38)] hover:text-[var(--rose-500)]"
+                      className="rounded-2xl border border-[rgba(213,109,85,0.22)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--slate-600)] transition-colors hover:border-[rgba(213,109,85,0.38)] hover:text-[var(--rose-500)]"
                     >
                       結束挑戰
                     </button>
@@ -278,14 +281,14 @@ export default function BlindArena() {
                     return (
                       <div
                         key={step.id}
-                        className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+                        className={`rounded-2xl border px-3 py-2 text-left transition-colors ${
                           isActive
                             ? 'border-[rgba(24,172,126,0.2)] bg-[rgba(24,172,126,0.1)] text-[var(--emerald-700)]'
                             : 'border-[var(--border-soft)] bg-white/65 text-[var(--slate-400)]'
                         }`}
                       >
                         <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Step {index + 1}</div>
-                        <div className="mt-1 text-sm font-medium">{step.label}</div>
+                        <div className="mt-1 text-[13px] font-medium leading-5">{step.label}</div>
                       </div>
                     );
                   })}
@@ -315,7 +318,7 @@ export default function BlindArena() {
                   </div>
                   <h2 className="mt-6 font-serif text-3xl font-semibold text-[var(--slate-900)]">用一個問題，開始第一局比較</h2>
                   <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-[var(--slate-600)]">
-                    先在底部輸入你的題目，或直接點一個範例問題。
+                    先在對話筐輸入你的題目，或直接點一個範例問題。
                     {isBlindMode ? ' 這一局會先隱藏模型名稱，讓你只看回答內容排序。' : ' 這一局會直接顯示模型名稱，方便明牌對照。'}
                   </p>
 
@@ -350,7 +353,7 @@ export default function BlindArena() {
                             onClick={handleReturnToCurrentRound}
                             className="font-medium text-[var(--emerald-700)] hover:text-[var(--emerald-500)]"
                           >
-                            回到目前局
+                            回到目前局數
                           </button>
                         )}
                         {displayedRound && displayedRoundIndex >= 0 && <div>第 {displayedRoundIndex + 1} 局</div>}
@@ -363,13 +366,13 @@ export default function BlindArena() {
                 {shouldShowHistoryRound && !isCompletedSession && (
                   <div className="rounded-[1.5rem] border border-[var(--amber-200)] bg-[var(--amber-50)] px-5 py-4 text-sm text-[var(--amber-900)]">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <span>目前正在查看歷史回合。回到目前局後，才可繼續排名、開始下一局或輸入新問題。</span>
+                      <span>目前正在查看歷史回合。回到目前局數後，才可繼續排名、開始下一局或輸入新問題。</span>
                       <button
                         type="button"
                         onClick={handleReturnToCurrentRound}
                         className="soft-button rounded-2xl px-4 py-2 text-xs font-medium"
                       >
-                        返回目前局
+                        返回目前局數
                       </button>
                     </div>
                   </div>
@@ -578,6 +581,7 @@ function ResponseCard({ response, mode, isRevealed, modelName, rank, index }: Re
 
   const title = mode === 'open' || isRevealed ? modelName : response.blindName;
   const shouldShowBlindReference = mode === 'blind' && isRevealed;
+  const shouldShowRankBadge = Boolean(rank) && (mode === 'open' || isRevealed);
 
   return (
     <div
@@ -596,7 +600,7 @@ function ResponseCard({ response, mode, isRevealed, modelName, rank, index }: Re
             <span className="text-xs text-[var(--slate-500)]">揭曉前代號為 {response.blindName}</span>
           )}
         </div>
-        {rank && (
+        {shouldShowRankBadge && rank && (
           <span className={`rounded-full px-3 py-1 text-sm font-medium ${rankColors[rank]}`}>
             {rankLabels[rank]}
           </span>
