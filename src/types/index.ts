@@ -16,6 +16,8 @@ export interface AIModel {
   source?: ModelSource;
   speed?: ModelSpeed;
   serverLabel?: string;
+  canonicalName?: string;
+  benchmarkLatencySeconds?: number;
   capabilities?: ModelCapability[];
 }
 
@@ -97,6 +99,7 @@ export interface SessionSummaryRound {
     modelId: string;
     modelName: string;
     response: string;
+    rank: number | null;
   }>;
   rankings: Array<{
     rank: number;

@@ -71,6 +71,16 @@ const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
     apiUrl: LOCAL_OLLAMA_5090_API_URL,
     model: 'translategemma:27b',
   },
+  'local-ollama-4090-translategemma-27b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'translategemma:27b',
+  },
+  'local-ollama-5090-translategemma-12b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'translategemma:12b',
+  },
   'local-ollama-5090-translategemma-4b': {
     kind: 'ollama',
     apiUrl: LOCAL_OLLAMA_5090_API_URL,
@@ -90,6 +100,36 @@ const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
     kind: 'ollama',
     apiUrl: LOCAL_OLLAMA_5090_API_URL,
     model: 'mistral-small3.2:24b',
+  },
+  'local-ollama-5090-ministral-3-3b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'ministral-3:3b',
+  },
+  'local-ollama-4090-ministral-3-3b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'ministral-3:3b',
+  },
+  'local-ollama-5090-ministral-3-8b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'ministral-3:8b',
+  },
+  'local-ollama-4090-ministral-3-8b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'ministral-3:8b',
+  },
+  'local-ollama-5090-ministral-3-14b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'ministral-3:14b',
+  },
+  'local-ollama-4090-ministral-3-14b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'ministral-3:14b',
   },
   'local-ollama-4090-medgemma-1.5-4b': {
     kind: 'ollama',
@@ -111,6 +151,96 @@ const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
     apiUrl: LOCAL_OLLAMA_4090_API_URL,
     model: 'gemma3:latest',
   },
+  'local-ollama-4090-gemma3-270m': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'gemma3:270m',
+  },
+  'local-ollama-4090-gemma3n-e4b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'gemma3n:e4b',
+  },
+  'local-ollama-4090-gemma3-27b-it-qat': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'gemma3:27b-it-qat',
+  },
+  'local-ollama-5090-gemma3-27b-it-qat': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'gemma3:27-it-qat',
+  },
+  'local-ollama-4090-gemma3-12b-it-qat': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'gemma3:12b-it-qat',
+  },
+  'local-ollama-4090-amoral-gemma3-12b-v2-qat': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'hf.co/soob3123/amoral-gemma3-12B-v2-qat-Q4_0-GGUF:latest',
+  },
+  'local-ollama-4090-phi4-mini': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'phi4-mini:latest',
+  },
+  'local-ollama-4090-granite-3.2-vision': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'ollama.com/library/granite3.2-vision:latest',
+  },
+  'local-ollama-4090-msmall-3.1-q6': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'djdeniro/msmall-3.1-q6:latest',
+  },
+  'local-ollama-4090-mistral-small': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'mistral-small:latest',
+  },
+  'local-ollama-4090-mistral-small-3.1-24b-q4-ks': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'cnjack/mistral-samll-3.1:24b-it-q4_K_S',
+  },
+  'local-ollama-5090-nemotron-3-nano-30b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'nemotron-3-nano:30b',
+  },
+  'local-ollama-5090-granite-docling': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'granite-docling:latest',
+  },
+  'local-ollama-5090-apriel-1.6-15b-thinker': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'Apriel-1.6-15b-Thinker:Q4_K_M',
+  },
+  'local-ollama-5090-apriel-1.5-15b-thinker': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'Apriel-1.5-15b-Thinker:Q4_K_M',
+  },
+  'local-ollama-5090-llama3.2-vision-11b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'llama3.2-vision:11b',
+  },
+  'local-ollama-5090-gpt-oss-20b-202511': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'gpt-oss:20b-202511',
+  },
+  'local-ollama-5090-gemma3-27b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_5090_API_URL,
+    model: 'gemma3:27b',
+  },
   'local-ollama-4090-translategemma-12b': {
     kind: 'ollama',
     apiUrl: LOCAL_OLLAMA_4090_API_URL,
@@ -125,6 +255,16 @@ const LOCAL_MODEL_CONFIGS: Record<string, LocalRuntimeConfig> = {
     kind: 'ollama',
     apiUrl: LOCAL_OLLAMA_4090_API_URL,
     model: 'gemma3:27b',
+  },
+  'local-ollama-4090-breeze-7b-instruct-v1-0': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'Breeze-7B-Instruct-v1_0:latest',
+  },
+  'local-ollama-4090-gemma3-12b': {
+    kind: 'ollama',
+    apiUrl: LOCAL_OLLAMA_4090_API_URL,
+    model: 'gemma3:12b',
   },
 };
 

@@ -114,13 +114,18 @@ export function createSessionSummary(session: ArenaSession): SessionSummary {
       roundNumber: index + 1,
       prompt: round.prompt,
       revealed: round.revealed,
-      responses: round.responses.map((response) => ({
-        blindName: response.blindName,
-        modelId: response.modelId,
-        modelName:
-          session.selectedModels.find((model) => model.id === response.modelId)?.name ?? response.modelId,
-        response: response.response,
-      })),
+      responses: round.responses.map((response) => {
+        const matchingRanking = round.rankings.find((ranking) => ranking.modelId === response.modelId);
+
+        return {
+          blindName: response.blindName,
+          modelId: response.modelId,
+          modelName:
+            session.selectedModels.find((model) => model.id === response.modelId)?.name ?? response.modelId,
+          response: response.response,
+          rank: matchingRanking?.rank ?? null,
+        };
+      }),
       rankings: round.rankings.map((ranking) => ({
         rank: ranking.rank,
         blindName: ranking.blindName,

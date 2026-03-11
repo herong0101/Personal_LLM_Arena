@@ -198,14 +198,14 @@ export default function BlindArena() {
         />
 
         <main className="flex min-h-screen flex-1 flex-col lg:h-screen">
-          <header className="border-b border-[var(--border-soft)] bg-[rgba(255,251,245,0.72)] px-4 py-3 backdrop-blur-xl sm:px-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="flex flex-col gap-3">
+          <header className="border-b border-[var(--border-soft)] bg-[rgba(255,251,245,0.72)] px-4 py-2.5 backdrop-blur-xl sm:px-6">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-2.5">
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setIsHistoryOpen(true)}
-                    className="soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium lg:hidden"
+                    className="soft-button inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium lg:hidden"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -215,7 +215,7 @@ export default function BlindArena() {
                   <button
                     type="button"
                     onClick={handleBack}
-                    className="soft-button inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
+                    className="soft-button inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -226,14 +226,14 @@ export default function BlindArena() {
 
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="font-serif text-[1.9rem] font-semibold text-[var(--slate-900)]">
+                    <h1 className="font-serif text-[1.7rem] font-semibold text-[var(--slate-900)]">
                       {isBlindMode ? '盲測競技場' : '公開競技場'}
                     </h1>
                     <div className="rounded-full bg-[rgba(24,172,126,0.1)] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[var(--emerald-700)]">
                       {ARENA_MODE_LABELS[arenaMode]}
                     </div>
                   </div>
-                  <p className="mt-1 text-sm leading-6 text-[var(--slate-600)]">
+                  <p className="mt-0.5 text-sm leading-5 text-[var(--slate-600)]">
                     同一問題比較模型表現。
                     {isBlindMode ? ' 送出排名後才揭曉模型身份。' : ' 目前直接顯示模型名稱。'}
                   </p>
@@ -243,7 +243,7 @@ export default function BlindArena() {
                   {selectedModels.map((model) => (
                     <span
                       key={model.id}
-                      className="rounded-full bg-white/78 px-3 py-1.5 text-xs font-medium text-[var(--slate-700)]"
+                      className="rounded-full bg-white/78 px-3 py-1 text-xs font-medium text-[var(--slate-700)]"
                     >
                       {model.name}
                     </span>
@@ -251,16 +251,16 @@ export default function BlindArena() {
                 </div>
               </div>
 
-              <div className="space-y-3 xl:max-w-md xl:text-right">
+              <div className="space-y-2 xl:max-w-md xl:text-right">
                 <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                  <div className="rounded-2xl bg-white/80 px-3 py-2 text-sm text-[var(--slate-600)]">
+                  <div className="rounded-2xl bg-white/80 px-3 py-1.5 text-sm text-[var(--slate-600)]">
                     第 <span className="font-semibold text-[var(--emerald-700)]">{roundCount + 1}</span> / {ARENA_CONFIG.maxRoundsPerSession} 局
                   </div>
                   {isCompletedSession ? (
                     <button
                       type="button"
                       onClick={() => dispatch({ type: 'SET_PHASE', payload: 'analytics' })}
-                      className="soft-button rounded-2xl px-3 py-2 text-sm font-medium"
+                      className="soft-button rounded-2xl px-3 py-1.5 text-sm font-medium"
                     >
                       返回送出頁
                     </button>
@@ -268,7 +268,7 @@ export default function BlindArena() {
                     <button
                       type="button"
                       onClick={endSession}
-                      className="rounded-2xl border border-[rgba(213,109,85,0.22)] bg-white/78 px-3 py-2 text-sm font-medium text-[var(--slate-600)] transition-colors hover:border-[rgba(213,109,85,0.38)] hover:text-[var(--rose-500)]"
+                      className="rounded-2xl border border-[rgba(213,109,85,0.22)] bg-white/78 px-3 py-1.5 text-sm font-medium text-[var(--slate-600)] transition-colors hover:border-[rgba(213,109,85,0.38)] hover:text-[var(--rose-500)]"
                     >
                       結束挑戰
                     </button>
@@ -281,14 +281,14 @@ export default function BlindArena() {
                     return (
                       <div
                         key={step.id}
-                        className={`rounded-2xl border px-3 py-2 text-left transition-colors ${
+                        className={`rounded-2xl border px-3 py-1.5 text-left transition-colors ${
                           isActive
                             ? 'border-[rgba(24,172,126,0.2)] bg-[rgba(24,172,126,0.1)] text-[var(--emerald-700)]'
                             : 'border-[var(--border-soft)] bg-white/65 text-[var(--slate-400)]'
                         }`}
                       >
                         <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Step {index + 1}</div>
-                        <div className="mt-1 text-[13px] font-medium leading-5">{step.label}</div>
+                        <div className="mt-0.5 text-[13px] font-medium leading-5">{step.label}</div>
                       </div>
                     );
                   })}
@@ -297,11 +297,11 @@ export default function BlindArena() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             {displayedResponses.length === 0 && !isLoading ? (
               <div className="mx-auto max-w-5xl">
-                <div className="glass-panel rounded-[2rem] p-6 text-center sm:p-10">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-[rgba(24,172,126,0.12)]">
+                <div className="glass-panel rounded-[2rem] p-5 text-center sm:p-8">
+                  <div className="mx-auto flex h-18 w-18 items-center justify-center rounded-[1.5rem] bg-[rgba(24,172,126,0.12)]">
                     <svg
                       className="h-10 w-10 text-[var(--emerald-600)]"
                       fill="none"
@@ -316,13 +316,13 @@ export default function BlindArena() {
                       />
                     </svg>
                   </div>
-                  <h2 className="mt-6 font-serif text-3xl font-semibold text-[var(--slate-900)]">用一個問題，開始第一局比較</h2>
-                  <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-[var(--slate-600)]">
+                  <h2 className="mt-5 font-serif text-3xl font-semibold text-[var(--slate-900)]">用一個問題，開始第一局比較</h2>
+                  <p className="mx-auto mt-3 max-w-2xl text-base leading-8 text-[var(--slate-600)]">
                     先在對話筐輸入你的題目，或直接點一個範例問題。
                     {isBlindMode ? ' 這一局會先隱藏模型名稱，讓你只看回答內容排序。' : ' 這一局會直接顯示模型名稱，方便明牌對照。'}
                   </p>
 
-                  <div className="mt-8 grid gap-4 md:grid-cols-2">
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
                     {SAMPLE_PROMPTS.map((samplePrompt) => (
                       <button
                         key={samplePrompt}
@@ -339,10 +339,10 @@ export default function BlindArena() {
                 </div>
               </div>
             ) : (
-              <div className="mx-auto max-w-7xl space-y-6">
+              <div className="mx-auto max-w-7xl space-y-5">
                 {displayedPrompt && (
-                  <div className="marble-card rounded-[1.5rem] p-5">
-                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="marble-card rounded-[1.5rem] p-4">
+                    <div className="mb-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--emerald-700)]">
                         {isCompletedSession ? '回合提問紀錄' : '本局題目'}
                       </div>
@@ -359,12 +359,12 @@ export default function BlindArena() {
                         {displayedRound && displayedRoundIndex >= 0 && <div>第 {displayedRoundIndex + 1} 局</div>}
                       </div>
                     </div>
-                    <p className="text-base leading-8 text-[var(--slate-700)]">{displayedPrompt}</p>
+                    <p className="text-base leading-7 text-[var(--slate-700)]">{displayedPrompt}</p>
                   </div>
                 )}
 
                 {shouldShowHistoryRound && !isCompletedSession && (
-                  <div className="rounded-[1.5rem] border border-[var(--amber-200)] bg-[var(--amber-50)] px-5 py-4 text-sm text-[var(--amber-900)]">
+                  <div className="rounded-[1.5rem] border border-[var(--amber-200)] bg-[var(--amber-50)] px-4 py-3 text-sm text-[var(--amber-900)]">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <span>目前正在查看歷史回合。回到目前局數後，才可繼續排名、開始下一局或輸入新問題。</span>
                       <button
@@ -379,7 +379,7 @@ export default function BlindArena() {
                 )}
 
                 <div
-                  className={`grid gap-5 ${
+                  className={`grid gap-4 ${
                     selectedModels.length === 1
                       ? 'grid-cols-1'
                       : selectedModels.length === 2
@@ -465,7 +465,7 @@ export default function BlindArena() {
                 )}
 
                 {isRevealed && !isCompletedSession && !shouldShowHistoryRound && (
-                  <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row animate-fade-in">
+                  <div className="flex flex-col justify-center gap-3 pt-1 sm:flex-row animate-fade-in">
                     {!isMaxRounds && canStartNewRound() ? (
                       <button
                         type="button"
@@ -493,17 +493,17 @@ export default function BlindArena() {
           </div>
 
           {!isCompletedSession && !shouldShowHistoryRound && (
-            <div className="border-t border-[var(--border-soft)] bg-[rgba(255,251,245,0.82)] px-4 py-4 backdrop-blur-xl sm:px-6">
+            <div className="border-t border-[var(--border-soft)] bg-[rgba(255,251,245,0.82)] px-4 py-3 backdrop-blur-xl sm:px-6">
               <form onSubmit={handleSubmitPrompt} className="mx-auto max-w-6xl">
                 {inputLocked && (
-                  <div className="mb-3 rounded-2xl border border-[var(--amber-200)] bg-[var(--amber-50)] px-4 py-3 text-sm text-[var(--amber-900)]">
+                  <div className="mb-2 rounded-2xl border border-[var(--amber-200)] bg-[var(--amber-50)] px-4 py-2.5 text-sm text-[var(--amber-900)]">
                     先完成本局排名後，才能送出下一個問題。
                   </div>
                 )}
 
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-                  <div className="field-shell flex-1 rounded-[1.5rem] p-3">
-                    <label htmlFor="arena-prompt" className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--slate-500)]">
+                <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end">
+                  <div className="field-shell flex-1 rounded-[1.5rem] p-2.5">
+                    <label htmlFor="arena-prompt" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--slate-500)]">
                       輸入本局題目
                     </label>
                     <textarea
@@ -512,14 +512,14 @@ export default function BlindArena() {
                       onChange={(event) => setPrompt(event.target.value)}
                       placeholder={`輸入您的問題，開始${ARENA_MODE_LABELS[arenaMode]}...`}
                       disabled={inputLocked}
-                      rows={3}
+                      rows={2}
                       className="w-full resize-none bg-transparent text-sm leading-7 text-[var(--slate-800)] outline-none placeholder:text-[var(--slate-400)] disabled:cursor-not-allowed"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={!prompt.trim() || inputLocked}
-                    className="metal-button flex items-center justify-center gap-2 rounded-[1.5rem] px-6 py-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="metal-button flex items-center justify-center gap-2 rounded-[1.5rem] px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isLoading ? (
                       <>

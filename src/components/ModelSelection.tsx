@@ -11,14 +11,14 @@ const QUICK_PRESETS = [
   {
     label: '雲端基準組',
     description: '用主流雲端模型快速建立基準線。',
-    modelIds: ['gpt-5.2', 'gemini-3.1-pro-preview', 'claude-opus-4-5'],
+    modelIds: ['gpt-5.4', 'gemini-3.1-pro-preview', 'claude-sonnet-4-6'],
   },
   {
     label: '地端快速組',
     description: '用回覆較快的本地模型先測一輪。',
     modelIds: [
-      'local-vllm-4090-gemma-3-27b-it-qat',
-      'local-ollama-5090-translategemma-27b',
+      'local-ollama-5090-ministral-3-14b',
+      'local-ollama-4090-breeze-7b-instruct-v1-0',
       'local-ollama-5090-gpt-oss-20b',
     ],
   },
@@ -26,9 +26,9 @@ const QUICK_PRESETS = [
     label: '醫療題材組',
     description: '適合先測醫療與保險相關題目。',
     modelIds: [
+      'gpt-5.4',
+      'claude-sonnet-4-6',
       'local-ollama-5090-medgemma-1.5-4b',
-      'local-ollama-4090-medgemma-1.5-4b',
-      'claude-opus-4-5',
     ],
   },
 ];
