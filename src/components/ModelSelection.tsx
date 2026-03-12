@@ -18,7 +18,7 @@ const QUICK_PRESETS = [
     description: '用回覆較快的本地模型先測一輪。',
     modelIds: [
       'local-ollama-5090-ministral-3-14b',
-      'local-ollama-4090-breeze-7b-instruct-v1-0',
+      'local-ollama-5090-gemma3-27b',
       'local-ollama-5090-gpt-oss-20b',
     ],
   },
