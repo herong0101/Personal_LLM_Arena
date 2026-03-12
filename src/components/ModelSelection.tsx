@@ -92,21 +92,17 @@ function getSpecialModelValidationError(model: AIModel, cloudModelIds: Set<strin
   if (model.orchestration.kind === 'pressure-test') {
     const attackerIds = model.orchestration.attackerModelIds;
 
-    if (!cloudModelIds.has(model.orchestration.targetModelId)) {
-      return `${model.name} 需要 1 個有效的受測雲端模型。`;
-    }
+      if (!cloudModelIds.has(model.orchestration.targetModelId)) {
+        return `${model.name} 需要 1 個有效的受測雲端模型。`;
+      }
 
-    if (attackerIds.length !== 2 || attackerIds.some((id) => !cloudModelIds.has(id))) {
-      return `${model.name} 需要 2 個有效的攻擊雲端模型。`;
-    }
+      if (attackerIds.length !== 2 || attackerIds.some((id) => !cloudModelIds.has(id))) {
+        return `${model.name} 需要 2 個有效的攻擊雲端模型。`;
+      }
 
-    if (new Set(attackerIds).size !== 2) {
-      return `${model.name} 的兩個攻擊模型必須不同。`;
-    }
 
-    if (attackerIds.includes(model.orchestration.targetModelId)) {
-      return `${model.name} 的攻擊模型不能與受測模型相同。`;
-    }
+
+
 
     return null;
   }
@@ -117,9 +113,6 @@ function getSpecialModelValidationError(model: AIModel, cloudModelIds: Set<strin
     return `${model.name} 的正方、反方與裁判都必須是有效的雲端模型。`;
   }
 
-  if (propositionModelId === oppositionModelId) {
-    return `${model.name} 的正方與反方模型必須不同。`;
-  }
 
   return null;
 }
@@ -528,6 +521,11 @@ export default function ModelSelection() {
                     <span className="text-sm text-[var(--slate-500)]">尚未選擇模型</span>
                   )}
                 </div>
+                {error && (
+                  <div className="rounded-2xl border border-[rgba(213,109,85,0.22)] bg-[var(--rose-100)] px-4 py-3 text-sm text-[var(--rose-500)] animate-fade-in">
+                    {error}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -721,7 +719,7 @@ function SpecialModelConfigurator({
               label={`攻擊者 ${index + 1}`}
               value={attackerModelId}
               models={cloudModels}
-              helper="這個角色會自稱專家或高壓審查者，專門挑戰受測模型。"
+              helper="這個角色會自稱專家或高壓審查者，專門挑戰受測模型，也可以與其他角色重複。"
               onChange={(nextValue) =>
                 onPressureTestFieldChange(model.id, 'attackerModelIds', nextValue, index)
               }
@@ -741,7 +739,7 @@ function SpecialModelConfigurator({
             label="反方模型"
             value={model.orchestration.oppositionModelId}
             models={cloudModels}
-            helper="必須扮演質疑與反對者。"
+            helper="必須扮演質疑與反對者，也可以與正方使用相同模型。"
             onChange={(nextValue) => onDebateFieldChange(model.id, 'oppositionModelId', nextValue)}
           />
           <ModelSelectField

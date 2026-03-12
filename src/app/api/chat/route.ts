@@ -389,10 +389,6 @@ function validateDebateConfig(orchestration: ArenaOrchestrationConfig | undefine
   assertCloudTextModelId(orchestration.oppositionModelId, '反方模型');
   assertCloudTextModelId(orchestration.judgeModelId, '裁判模型');
 
-  if (orchestration.propositionModelId === orchestration.oppositionModelId) {
-    throw new Error('辯論模式的正方與反方模型必須不同');
-  }
-
   return orchestration;
 }
 
@@ -410,14 +406,6 @@ function validatePressureTestConfig(orchestration: ArenaOrchestrationConfig | un
   orchestration.attackerModelIds.forEach((modelId, index) => {
     assertCloudTextModelId(modelId, `攻擊者 ${index + 1}`);
   });
-
-  if (new Set(orchestration.attackerModelIds).size !== 2) {
-    throw new Error('壓力測試模式的兩個攻擊模型必須不同');
-  }
-
-  if (orchestration.attackerModelIds.includes(orchestration.targetModelId)) {
-    throw new Error('壓力測試模式的攻擊模型不能與受測模型相同');
-  }
 
   return orchestration;
 }
@@ -621,7 +609,13 @@ async function handleArenaPressureTest(
     temperature: 0.25,
   });
 
-  return reconsideredResponse.trim() || '本輪受測模型在壓力測試後未回傳有效內容，請改用其他模型組合再試一次。';
+  const normalizedInitialResponse = initialResponse.trim() || '本輪受測模型未回傳有效的初始內容。';
+  const normalizedReconsideredResponse =
+    reconsideredResponse.trim() || '本輪受測模型在壓力測試後未回傳有效內容，請改用其他模型組合再試一次。';
+
+  return ['初始回應：', normalizedInitialResponse, '被挑戰後的回應：', normalizedReconsideredResponse].join(
+    '\n\n'
+  );
 }
 
 function requireEnv(nameCandidates: string[]): string {
