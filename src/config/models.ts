@@ -1,4 +1,4 @@
-import { AIModel, ModelCapability, ModelSpeed, StudioMode } from '@/types';
+import { AIModel, ArenaOrchestrationConfig, ModelCapability, ModelSpeed, StudioMode } from '@/types';
 
 const STUDIO_TEXT_CAPABILITIES: ModelCapability[] = [
   'chat',
@@ -9,6 +9,25 @@ const STUDIO_TEXT_CAPABILITIES: ModelCapability[] = [
 ];
 
 const STUDIO_IMAGE_CAPABILITIES: ModelCapability[] = ['image'];
+
+const DEFAULT_EXPERT_DISCUSSION_CONFIG: ArenaOrchestrationConfig = {
+  kind: 'expert-discussion',
+  memberModelIds: ['gpt-5.4', 'gemini-3.1-pro-preview', 'claude-sonnet-4-6'],
+  synthesisModelId: 'gpt-5.4',
+};
+
+const DEFAULT_DEBATE_CONFIG: ArenaOrchestrationConfig = {
+  kind: 'debate',
+  propositionModelId: 'gpt-5.4',
+  oppositionModelId: 'claude-sonnet-4-6',
+  judgeModelId: 'gemini-3.1-pro-preview',
+};
+
+const DEFAULT_PRESSURE_TEST_CONFIG: ArenaOrchestrationConfig = {
+  kind: 'pressure-test',
+  targetModelId: 'gpt-5.4',
+  attackerModelIds: ['claude-sonnet-4-6', 'gemini-3.1-pro-preview'],
+};
 
 function createLocalModel(config: {
   id: string;
@@ -429,6 +448,45 @@ const LOCAL_MODELS: AIModel[] = dedupeLocalModelsByName([
   }),
 ]);
 
+const ARENA_SPECIAL_MODELS: AIModel[] = [
+  {
+    id: 'arena-special-expert-discussion',
+    name: '專家討論模式',
+    provider: '特殊模式',
+    description:
+      '先讓 3 個雲端模型各自分析，再由 1 個雲端模型統整成單一最終答案。盲測時只會看到統整後輸出。',
+    available: true,
+    source: 'cloud',
+    capabilities: ['chat'],
+    isArenaSpecial: true,
+    orchestration: DEFAULT_EXPERT_DISCUSSION_CONFIG,
+  },
+  {
+    id: 'arena-special-debate',
+    name: '辯論模式',
+    provider: '特殊模式',
+    description:
+      '先由 1 個雲端模型提出答案，再由第 2 個雲端模型扮演反對者挑戰，最後由裁判模型做判定與整理。',
+    available: true,
+    source: 'cloud',
+    capabilities: ['chat'],
+    isArenaSpecial: true,
+    orchestration: DEFAULT_DEBATE_CONFIG,
+  },
+  {
+    id: 'arena-special-pressure-test',
+    name: '壓力測試模式',
+    provider: '特殊模式',
+    description:
+      '先讓 1 個雲端模型給出原始答案，再由 2 個雲端模型以強勢專家角色同步挑戰，最後把挑戰意見送回原模型檢驗是否改變立場。',
+    available: true,
+    source: 'cloud',
+    capabilities: ['chat'],
+    isArenaSpecial: true,
+    orchestration: DEFAULT_PRESSURE_TEST_CONFIG,
+  },
+];
+
 export const AVAILABLE_MODELS: AIModel[] = [
   {
     id: 'gpt-5.2',
@@ -538,6 +596,7 @@ export const AVAILABLE_MODELS: AIModel[] = [
     source: 'cloud',
     capabilities: STUDIO_TEXT_CAPABILITIES,
   },
+  ...ARENA_SPECIAL_MODELS,
   ...LOCAL_MODELS,
 ];
 

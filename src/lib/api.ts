@@ -2,10 +2,13 @@
  * Browser-side wrapper for server API calls.
  */
 
+import { ArenaOrchestrationConfig } from '@/types';
+
 export interface CallModelOptions {
   systemPrompt?: string;
   responseTokenLimit?: number;
   temperature?: number;
+  orchestration?: ArenaOrchestrationConfig;
 }
 
 export interface GeneratedImagePayload {
@@ -29,7 +32,14 @@ async function requestModel(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ modelId, prompt, ...options }),
+    body: JSON.stringify({
+      modelId,
+      prompt,
+      systemPrompt: options.systemPrompt,
+      responseTokenLimit: options.responseTokenLimit,
+      temperature: options.temperature,
+      orchestration: options.orchestration,
+    }),
   });
 
   const data = (await response.json()) as ChatApiResponse;

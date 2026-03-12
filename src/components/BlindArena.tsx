@@ -235,7 +235,7 @@ export default function BlindArena() {
                   </div>
                   <p className="mt-0.5 text-sm leading-5 text-[var(--slate-600)]">
                     同一問題比較模型表現。
-                    {isBlindMode ? ' 送出排名後才揭曉模型身份。' : ' 目前直接顯示模型名稱。'}
+                    {isBlindMode ? ' 所有回答會等全部完成後同步顯示，送出排名後才揭曉模型身份。' : ' 目前直接顯示模型名稱。'}
                   </p>
                 </div>
 
@@ -319,7 +319,7 @@ export default function BlindArena() {
                   <h2 className="mt-5 font-serif text-3xl font-semibold text-[var(--slate-900)]">用一個問題，開始第一局比較</h2>
                   <p className="mx-auto mt-3 max-w-2xl text-base leading-8 text-[var(--slate-600)]">
                     先在對話筐輸入你的題目，或直接點一個範例問題。
-                    {isBlindMode ? ' 這一局會先隱藏模型名稱，讓你只看回答內容排序。' : ' 這一局會直接顯示模型名稱，方便明牌對照。'}
+                    {isBlindMode ? ' 這一局會先隱藏模型名稱，並在全部回答完成後一起公布，讓你只看內容排序。' : ' 這一局會直接顯示模型名稱，方便明牌對照。'}
                   </p>
 
                   <div className="mt-6 grid gap-4 md:grid-cols-2">

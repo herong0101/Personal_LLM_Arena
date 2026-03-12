@@ -260,36 +260,59 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
 
     dispatch({ type: 'SET_RESPONSES', payload: initialResponses });
 
-    // Call each model and update as responses come in
-    const promises = shuffledModels.map(async (model, index) => {
+    const requests = shuffledModels.map(async (model, index) => {
       try {
-        const response = await callModel(model.id, prompt);
-        dispatch({
-          type: 'UPDATE_RESPONSE',
-          payload: {
-            index,
-            response: {
-              response,
-              isLoading: false,
-              timestamp: Date.now(),
-            },
-          },
+        const response = await callModel(model.id, prompt, {
+          orchestration: model.orchestration,
         });
+
+        return {
+          index,
+          response: {
+            response,
+            isLoading: false,
+            timestamp: Date.now(),
+          },
+        };
       } catch (error) {
-        dispatch({
-          type: 'UPDATE_RESPONSE',
-          payload: {
-            index,
-            response: {
-              response: `錯誤：無法獲取回應 - ${error}`,
-              isLoading: false,
-            },
+        return {
+          index,
+          response: {
+            response: `錯誤：無法獲取回應 - ${error instanceof Error ? error.message : String(error)}`,
+            isLoading: false,
+            timestamp: Date.now(),
           },
-        });
+        };
       }
     });
 
-    await Promise.all(promises);
+    if (state.arenaMode === 'blind') {
+      const resolvedResponses = await Promise.all(requests);
+      const completedResponses = [...initialResponses];
+
+      resolvedResponses.forEach(({ index, response }) => {
+        completedResponses[index] = {
+          ...completedResponses[index],
+          ...response,
+        };
+      });
+
+      dispatch({ type: 'SET_RESPONSES', payload: completedResponses });
+    } else {
+      await Promise.all(
+        requests.map(async (requestPromise) => {
+          const { index, response } = await requestPromise;
+          dispatch({
+            type: 'UPDATE_RESPONSE',
+            payload: {
+              index,
+              response,
+            },
+          });
+        })
+      );
+    }
+
     dispatch({ type: 'SET_LOADING', payload: false });
   };
 

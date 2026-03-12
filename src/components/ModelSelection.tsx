@@ -3,7 +3,7 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { ARENA_CONFIG, ARENA_MODE_LABELS, AVAILABLE_MODELS, MODEL_SPEED_LABELS } from '@/config/models';
 import { useArena } from '@/context/ArenaContext';
-import { AIModel, ModelSource } from '@/types';
+import { AIModel, ArenaOrchestrationConfig, ModelSource } from '@/types';
 
 type SourceFilter = 'all' | ModelSource;
 
@@ -33,20 +33,120 @@ const QUICK_PRESETS = [
   },
 ];
 
+function cloneOrchestration(orchestration?: ArenaOrchestrationConfig): ArenaOrchestrationConfig | undefined {
+  if (!orchestration) {
+    return undefined;
+  }
+
+  if (orchestration.kind === 'expert-discussion') {
+    return {
+      ...orchestration,
+      memberModelIds: [...orchestration.memberModelIds],
+    };
+  }
+
+  if (orchestration.kind === 'pressure-test') {
+    return {
+      ...orchestration,
+      attackerModelIds: [...orchestration.attackerModelIds],
+    };
+  }
+
+  return { ...orchestration };
+}
+
+function cloneModel(model: AIModel): AIModel {
+  return {
+    ...model,
+    orchestration: cloneOrchestration(model.orchestration),
+  };
+}
+
+function isSpecialArenaModel(model: AIModel): boolean {
+  return Boolean(model.isArenaSpecial && model.orchestration);
+}
+
+function getSpecialModelValidationError(model: AIModel, cloudModelIds: Set<string>): string | null {
+  if (!model.orchestration) {
+    return null;
+  }
+
+  if (model.orchestration.kind === 'expert-discussion') {
+    const memberIds = model.orchestration.memberModelIds;
+
+    if (memberIds.length !== 3 || memberIds.some((id) => !cloudModelIds.has(id))) {
+      return `${model.name} 需要 3 個有效的雲端成員模型。`;
+    }
+
+    if (new Set(memberIds).size !== 3) {
+      return `${model.name} 的 3 個成員模型必須互不重複。`;
+    }
+
+    if (!cloudModelIds.has(model.orchestration.synthesisModelId)) {
+      return `${model.name} 需要 1 個有效的雲端統整模型。`;
+    }
+
+    return null;
+  }
+
+  if (model.orchestration.kind === 'pressure-test') {
+    const attackerIds = model.orchestration.attackerModelIds;
+
+    if (!cloudModelIds.has(model.orchestration.targetModelId)) {
+      return `${model.name} 需要 1 個有效的受測雲端模型。`;
+    }
+
+    if (attackerIds.length !== 2 || attackerIds.some((id) => !cloudModelIds.has(id))) {
+      return `${model.name} 需要 2 個有效的攻擊雲端模型。`;
+    }
+
+    if (new Set(attackerIds).size !== 2) {
+      return `${model.name} 的兩個攻擊模型必須不同。`;
+    }
+
+    if (attackerIds.includes(model.orchestration.targetModelId)) {
+      return `${model.name} 的攻擊模型不能與受測模型相同。`;
+    }
+
+    return null;
+  }
+
+  const { propositionModelId, oppositionModelId, judgeModelId } = model.orchestration;
+
+  if (!cloudModelIds.has(propositionModelId) || !cloudModelIds.has(oppositionModelId) || !cloudModelIds.has(judgeModelId)) {
+    return `${model.name} 的正方、反方與裁判都必須是有效的雲端模型。`;
+  }
+
+  if (propositionModelId === oppositionModelId) {
+    return `${model.name} 的正方與反方模型必須不同。`;
+  }
+
+  return null;
+}
+
 export default function ModelSelection() {
   const { dispatch, startSession, state } = useArena();
   const [selectedModels, setSelectedModels] = useState<AIModel[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSpecialModelId, setActiveSpecialModelId] = useState<string | null>(null);
 
   const availableModels = AVAILABLE_MODELS.filter(
     (model) => model.available && model.capabilities?.includes('chat')
   );
+  const cloudModels = AVAILABLE_MODELS.filter(
+    (model) =>
+      model.available &&
+      model.source === 'cloud' &&
+      model.capabilities?.includes('chat') &&
+      !model.isArenaSpecial
+  );
+  const cloudModelIds = new Set(cloudModels.map((model) => model.id));
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const modeDescription =
     state.arenaMode === 'blind'
-      ? '回答會先匿名顯示，送出排名後才揭露模型身份。'
+      ? '回答會先匿名顯示，且會等全部模型完成後再同步公布；送出排名後才揭露模型身份。'
       : '回答會直接顯示模型名稱，方便比較。';
 
   const filteredModels = useMemo(() => {
@@ -76,10 +176,16 @@ export default function ModelSelection() {
     }, {} as Record<string, AIModel[]>);
   }, [filteredModels]);
 
+  const activeSpecialModel =
+    selectedModels.find((model) => model.id === activeSpecialModelId && isSpecialArenaModel(model)) ?? null;
+
   const toggleModel = (model: AIModel) => {
     setError(null);
 
     if (selectedModels.find((m) => m.id === model.id)) {
+      if (activeSpecialModelId === model.id) {
+        setActiveSpecialModelId(null);
+      }
       setSelectedModels(selectedModels.filter((m) => m.id !== model.id));
       return;
     }
@@ -89,21 +195,133 @@ export default function ModelSelection() {
       return;
     }
 
-    setSelectedModels([...selectedModels, model]);
+    const nextModel = cloneModel(model);
+    setSelectedModels([...selectedModels, nextModel]);
+
+    if (isSpecialArenaModel(nextModel)) {
+      setActiveSpecialModelId(nextModel.id);
+    }
   };
 
   const applyPreset = (modelIds: string[]) => {
     const models = modelIds
       .map((id) => availableModels.find((model) => model.id === id))
       .filter((model): model is AIModel => Boolean(model))
+      .map(cloneModel)
       .slice(0, ARENA_CONFIG.maxModelsPerRound);
 
     setSelectedModels(models);
+    setActiveSpecialModelId(models.find(isSpecialArenaModel)?.id ?? null);
     setError(null);
+  };
+
+  const updateSelectedModel = (modelId: string, updater: (model: AIModel) => AIModel) => {
+    setSelectedModels((current) =>
+      current.map((model) => (model.id === modelId ? updater(model) : model))
+    );
+    setError(null);
+  };
+
+  const updateExpertMember = (modelId: string, memberIndex: number, nextMemberModelId: string) => {
+    updateSelectedModel(modelId, (model) => {
+      if (model.orchestration?.kind !== 'expert-discussion') {
+        return model;
+      }
+
+      const nextMembers = [...model.orchestration.memberModelIds];
+      nextMembers[memberIndex] = nextMemberModelId;
+
+      return {
+        ...model,
+        orchestration: {
+          ...model.orchestration,
+          memberModelIds: nextMembers,
+        },
+      };
+    });
+  };
+
+  const updateExpertSynthesis = (modelId: string, nextSynthesisModelId: string) => {
+    updateSelectedModel(modelId, (model) => {
+      if (model.orchestration?.kind !== 'expert-discussion') {
+        return model;
+      }
+
+      return {
+        ...model,
+        orchestration: {
+          ...model.orchestration,
+          synthesisModelId: nextSynthesisModelId,
+        },
+      };
+    });
+  };
+
+  const updateDebateField = (
+    modelId: string,
+    field: 'propositionModelId' | 'oppositionModelId' | 'judgeModelId',
+    nextValue: string
+  ) => {
+    updateSelectedModel(modelId, (model) => {
+      if (model.orchestration?.kind !== 'debate') {
+        return model;
+      }
+
+      return {
+        ...model,
+        orchestration: {
+          ...model.orchestration,
+          [field]: nextValue,
+        },
+      };
+    });
+  };
+
+  const updatePressureTestField = (
+    modelId: string,
+    field: 'targetModelId' | 'attackerModelIds',
+    nextValue: string,
+    attackerIndex?: number
+  ) => {
+    updateSelectedModel(modelId, (model) => {
+      if (model.orchestration?.kind !== 'pressure-test') {
+        return model;
+      }
+
+      if (field === 'targetModelId') {
+        return {
+          ...model,
+          orchestration: {
+            ...model.orchestration,
+            targetModelId: nextValue,
+          },
+        };
+      }
+
+      const nextAttackers = [...model.orchestration.attackerModelIds];
+      nextAttackers[attackerIndex ?? 0] = nextValue;
+
+      return {
+        ...model,
+        orchestration: {
+          ...model.orchestration,
+          attackerModelIds: nextAttackers,
+        },
+      };
+    });
   };
 
   const handleBack = () => {
     dispatch({ type: 'SET_PHASE', payload: 'landing' });
+  };
+
+  const openSpecialModelConfigurator = (modelId: string) => {
+    setActiveSpecialModelId(modelId);
+    setError(null);
+  };
+
+  const closeSpecialModelConfigurator = () => {
+    setActiveSpecialModelId(null);
   };
 
   const handleStart = () => {
@@ -111,6 +329,16 @@ export default function ModelSelection() {
       setError(`請至少選擇 ${ARENA_CONFIG.minModelsPerRound} 個模型`);
       return;
     }
+
+    const configurationError = selectedModels
+      .map((model) => getSpecialModelValidationError(model, cloudModelIds))
+      .find((message): message is string => Boolean(message));
+
+    if (configurationError) {
+      setError(configurationError);
+      return;
+    }
+
     startSession(selectedModels);
   };
 
@@ -280,12 +508,21 @@ export default function ModelSelection() {
                 <div className="flex flex-wrap gap-2">
                   {selectedModels.length > 0 ? (
                     selectedModels.map((model) => (
-                      <span
+                      <div
                         key={model.id}
-                        className="rounded-full bg-white/80 px-3 py-2 text-sm text-[var(--slate-700)]"
+                        className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 text-sm text-[var(--slate-700)]"
                       >
                         {model.name}
-                      </span>
+                        {isSpecialArenaModel(model) && (
+                          <button
+                            type="button"
+                            onClick={() => openSpecialModelConfigurator(model.id)}
+                            className="rounded-full bg-[rgba(59,130,246,0.12)] px-2.5 py-1 text-xs font-medium text-[var(--sky-700)] transition-colors hover:bg-[rgba(59,130,246,0.18)]"
+                          >
+                            設定角色
+                          </button>
+                        )}
+                      </div>
                     ))
                   ) : (
                     <span className="text-sm text-[var(--slate-500)]">尚未選擇模型</span>
@@ -296,7 +533,10 @@ export default function ModelSelection() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => setSelectedModels([])}
+                  onClick={() => {
+                    setSelectedModels([]);
+                    setActiveSpecialModelId(null);
+                  }}
                   className="soft-button rounded-2xl px-5 py-3 text-sm font-medium"
                 >
                   清空選擇
@@ -316,6 +556,18 @@ export default function ModelSelection() {
           </div>
         </div>
       </div>
+
+      {activeSpecialModel && (
+        <SpecialModelModal
+          model={activeSpecialModel}
+          cloudModels={cloudModels}
+          onClose={closeSpecialModelConfigurator}
+          onExpertMemberChange={updateExpertMember}
+          onExpertSynthesisChange={updateExpertSynthesis}
+          onPressureTestFieldChange={updatePressureTestField}
+          onDebateFieldChange={updateDebateField}
+        />
+      )}
     </div>
   );
 }
@@ -363,6 +615,11 @@ function ModelCard({ model, isSelected, onToggle }: ModelCardProps) {
                 {MODEL_SPEED_LABELS[model.speed]}
               </span>
             )}
+            {model.isArenaSpecial && (
+              <span className="rounded-full bg-[rgba(59,130,246,0.12)] px-2.5 py-1 text-xs text-[var(--sky-700)]">
+                多模型編排
+              </span>
+            )}
             {isSelected && (
               <span className="rounded-full bg-[var(--emerald-500)] px-2.5 py-1 text-xs text-white">
                 已選擇
@@ -386,5 +643,208 @@ function ModelCard({ model, isSelected, onToggle }: ModelCardProps) {
         </div>
       </div>
     </button>
+  );
+}
+
+interface SpecialModelConfiguratorProps {
+  model: AIModel;
+  cloudModels: AIModel[];
+  onExpertMemberChange: (modelId: string, memberIndex: number, nextMemberModelId: string) => void;
+  onExpertSynthesisChange: (modelId: string, nextSynthesisModelId: string) => void;
+  onPressureTestFieldChange: (
+    modelId: string,
+    field: 'targetModelId' | 'attackerModelIds',
+    nextValue: string,
+    attackerIndex?: number
+  ) => void;
+  onDebateFieldChange: (
+    modelId: string,
+    field: 'propositionModelId' | 'oppositionModelId' | 'judgeModelId',
+    nextValue: string
+  ) => void;
+}
+
+function SpecialModelConfigurator({
+  model,
+  cloudModels,
+  onExpertMemberChange,
+  onExpertSynthesisChange,
+  onPressureTestFieldChange,
+  onDebateFieldChange,
+}: SpecialModelConfiguratorProps) {
+  if (!model.orchestration) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[1.75rem] border border-[rgba(59,130,246,0.14)] bg-[rgba(247,250,255,0.96)] p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sky-700)]">特殊模型設定</div>
+          <h3 className="mt-2 font-serif text-2xl font-semibold text-[var(--slate-900)]">{model.name}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--slate-600)]">{model.description}</p>
+        </div>
+      </div>
+
+      {model.orchestration.kind === 'expert-discussion' ? (
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          {model.orchestration.memberModelIds.map((memberModelId, index) => (
+            <ModelSelectField
+              key={`${model.id}-member-${index}`}
+              label={`專家成員 ${index + 1}`}
+              value={memberModelId}
+              models={cloudModels}
+              helper="三位成員會先平行分析，再交給統整者合併成單一答案。"
+              onChange={(nextValue) => onExpertMemberChange(model.id, index, nextValue)}
+            />
+          ))}
+          <ModelSelectField
+            label="統整者"
+            value={model.orchestration.synthesisModelId}
+            models={cloudModels}
+            helper="統整者可以與前面三位成員重複。"
+            onChange={(nextValue) => onExpertSynthesisChange(model.id, nextValue)}
+          />
+        </div>
+      ) : model.orchestration.kind === 'pressure-test' ? (
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ModelSelectField
+            label="受測模型"
+            value={model.orchestration.targetModelId}
+            models={cloudModels}
+            helper="先由這個模型給出原始答案，最後也由它重新審視是否改變立場。"
+            onChange={(nextValue) => onPressureTestFieldChange(model.id, 'targetModelId', nextValue)}
+          />
+          {model.orchestration.attackerModelIds.map((attackerModelId, index) => (
+            <ModelSelectField
+              key={`${model.id}-attacker-${index}`}
+              label={`攻擊者 ${index + 1}`}
+              value={attackerModelId}
+              models={cloudModels}
+              helper="這個角色會自稱專家或高壓審查者，專門挑戰受測模型。"
+              onChange={(nextValue) =>
+                onPressureTestFieldChange(model.id, 'attackerModelIds', nextValue, index)
+              }
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ModelSelectField
+            label="正方模型"
+            value={model.orchestration.propositionModelId}
+            models={cloudModels}
+            helper="先提出原始主張。"
+            onChange={(nextValue) => onDebateFieldChange(model.id, 'propositionModelId', nextValue)}
+          />
+          <ModelSelectField
+            label="反方模型"
+            value={model.orchestration.oppositionModelId}
+            models={cloudModels}
+            helper="必須扮演質疑與反對者。"
+            onChange={(nextValue) => onDebateFieldChange(model.id, 'oppositionModelId', nextValue)}
+          />
+          <ModelSelectField
+            label="裁判模型"
+            value={model.orchestration.judgeModelId}
+            models={cloudModels}
+            helper="最後判定哪一方較有道理並整理成最終答案。"
+            onChange={(nextValue) => onDebateFieldChange(model.id, 'judgeModelId', nextValue)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SpecialModelModalProps extends SpecialModelConfiguratorProps {
+  onClose: () => void;
+}
+
+function SpecialModelModal({
+  model,
+  cloudModels,
+  onClose,
+  onExpertMemberChange,
+  onExpertSynthesisChange,
+  onPressureTestFieldChange,
+  onDebateFieldChange,
+}: SpecialModelModalProps) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(17,24,39,0.34)] px-4 py-6 backdrop-blur-[2px]">
+      <button
+        type="button"
+        aria-label="關閉特殊模型設定"
+        onClick={onClose}
+        className="absolute inset-0"
+      />
+      <div className="relative z-10 w-full max-w-4xl">
+        <div className="glass-panel rounded-[2rem] p-5 shadow-[0_30px_80px_rgba(17,24,39,0.18)] sm:p-6">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--sky-700)]">角色設定</div>
+              <h2 className="mt-2 font-serif text-3xl font-semibold text-[var(--slate-900)]">{model.name}</h2>
+              <p className="mt-2 text-sm leading-7 text-[var(--slate-600)]">
+                選擇每個角色要由哪個雲端模型擔任。設定完成後，此特殊模式會像單一模型一樣參與競技場。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="soft-button rounded-full px-4 py-2 text-sm font-medium"
+            >
+              完成
+            </button>
+          </div>
+
+          <SpecialModelConfigurator
+            model={model}
+            cloudModels={cloudModels}
+            onExpertMemberChange={onExpertMemberChange}
+            onExpertSynthesisChange={onExpertSynthesisChange}
+            onPressureTestFieldChange={onPressureTestFieldChange}
+            onDebateFieldChange={onDebateFieldChange}
+          />
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="metal-button rounded-2xl px-6 py-3 text-sm font-semibold text-white"
+            >
+              套用設定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ModelSelectFieldProps {
+  label: string;
+  value: string;
+  models: AIModel[];
+  helper: string;
+  onChange: (nextValue: string) => void;
+}
+
+function ModelSelectField({ label, value, models, helper, onChange }: ModelSelectFieldProps) {
+  return (
+    <label className="block rounded-[1.5rem] border border-[var(--border-soft)] bg-white/88 p-4">
+      <div className="text-sm font-semibold text-[var(--slate-800)]">{label}</div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-3 w-full rounded-2xl border border-[var(--marble-300)] bg-white px-4 py-3 text-sm text-[var(--slate-700)] focus:outline-none focus:ring-2 focus:ring-[var(--emerald-400)]"
+      >
+        {models.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.name}
+          </option>
+        ))}
+      </select>
+      <div className="mt-2 text-xs leading-6 text-[var(--slate-500)]">{helper}</div>
+    </label>
   );
 }

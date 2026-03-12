@@ -5,6 +5,25 @@ export type ModelSpeed = 'fast' | 'medium' | 'slow';
 export type ModelCapability = 'chat' | 'document' | 'reasoning' | 'expert' | 'memory' | 'image';
 export type StudioMode = 'chat' | 'reasoning' | 'expert' | 'image';
 export type StudioRole = 'user' | 'assistant' | 'system';
+export type ArenaSpecialMode = 'expert-discussion' | 'debate' | 'pressure-test';
+
+export type ArenaOrchestrationConfig =
+  | {
+      kind: 'expert-discussion';
+      memberModelIds: string[];
+      synthesisModelId: string;
+    }
+  | {
+      kind: 'debate';
+      propositionModelId: string;
+      oppositionModelId: string;
+      judgeModelId: string;
+    }
+  | {
+      kind: 'pressure-test';
+      targetModelId: string;
+      attackerModelIds: string[];
+    };
 
 // Model types
 export interface AIModel {
@@ -19,6 +38,8 @@ export interface AIModel {
   canonicalName?: string;
   benchmarkLatencySeconds?: number;
   capabilities?: ModelCapability[];
+  isArenaSpecial?: boolean;
+  orchestration?: ArenaOrchestrationConfig;
 }
 
 // Response from model

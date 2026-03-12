@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AzureOpenAI } from 'openai';
+import type { ArenaOrchestrationConfig } from '@/types';
 
 const DEFAULT_AZURE_OPENAI_ENDPOINT = 'https://9n00400.openai.azure.com/';
 const DEFAULT_AZURE_OPENAI_DEPLOYMENT = 'gpt-5.2';
@@ -9,6 +10,9 @@ const PROJECT_04_AZURE_OPENAI_ENDPOINT = 'https://project-04-openai-service.open
 const PROJECT_04_AZURE_OPENAI_API_VERSION = '2025-04-01-preview';
 const PROJECT_04_AZURE_OPENAI_GPT_54_DEPLOYMENT = 'project-04-gpt-5.4';
 const PROJECT_04_AZURE_OPENAI_GPT_54_PRO_DEPLOYMENT = 'project-04-gpt-5.4-pro';
+const ARENA_SPECIAL_EXPERT_MODEL_ID = 'arena-special-expert-discussion';
+const ARENA_SPECIAL_DEBATE_MODEL_ID = 'arena-special-debate';
+const ARENA_SPECIAL_PRESSURE_TEST_MODEL_ID = 'arena-special-pressure-test';
 
 const DEFAULT_ANTHROPIC_BASE_URL =
   'https://project3-docai-resource.services.ai.azure.com/anthropic/';
@@ -23,6 +27,14 @@ const ARENA_SYSTEM_PROMPT =
 const DEFAULT_RESPONSE_TOKEN_LIMIT = 4096;
 const DEFAULT_TEMPERATURE = 0.3;
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_TEXT_MODEL_IDS = new Set([
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-3-pro-preview',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-flash-lite-preview',
+]);
 
 interface ProviderRequestOptions {
   systemPrompt?: string;
@@ -311,6 +323,306 @@ const ANTHROPIC_MODEL_CONFIGS: Record<string, AnthropicModelConfig> = {
     ],
   },
 };
+
+function isCloudTextModelId(modelId: string): boolean {
+  return modelId in AZURE_OPENAI_MODEL_CONFIGS || modelId in ANTHROPIC_MODEL_CONFIGS || GEMINI_TEXT_MODEL_IDS.has(modelId);
+}
+
+function assertCloudTextModelId(modelId: string, role: string): void {
+  if (!isCloudTextModelId(modelId)) {
+    throw new Error(`${role} 必須使用雲端文字模型，目前收到：${modelId}`);
+  }
+}
+
+async function handleCloudTextModel(
+  prompt: string,
+  modelId: string,
+  options: ProviderRequestOptions
+): Promise<string> {
+  if (modelId in AZURE_OPENAI_MODEL_CONFIGS) {
+    return handleOpenAI(prompt, modelId, options);
+  }
+
+  if (GEMINI_TEXT_MODEL_IDS.has(modelId)) {
+    return handleGemini(prompt, modelId, options);
+  }
+
+  if (modelId in ANTHROPIC_MODEL_CONFIGS) {
+    return handleAnthropic(prompt, modelId, options);
+  }
+
+  throw new Error(`Unsupported cloud model: ${modelId}`);
+}
+
+function formatOrchestrationFailure(modelId: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : '未知錯誤';
+  return `[${modelId}] 本輪未取得有效回應：${message}`;
+}
+
+function validateExpertDiscussionConfig(orchestration: ArenaOrchestrationConfig | undefined): Extract<ArenaOrchestrationConfig, { kind: 'expert-discussion' }> {
+  if (!orchestration || orchestration.kind !== 'expert-discussion') {
+    throw new Error('專家討論模式缺少有效設定');
+  }
+
+  if (orchestration.memberModelIds.length !== 3) {
+    throw new Error('專家討論模式必須指定 3 個成員模型');
+  }
+
+  if (new Set(orchestration.memberModelIds).size !== 3) {
+    throw new Error('專家討論模式的 3 個成員模型必須互不重複');
+  }
+
+  orchestration.memberModelIds.forEach((modelId, index) => {
+    assertCloudTextModelId(modelId, `專家成員 ${index + 1}`);
+  });
+  assertCloudTextModelId(orchestration.synthesisModelId, '專家統整者');
+
+  return orchestration;
+}
+
+function validateDebateConfig(orchestration: ArenaOrchestrationConfig | undefined): Extract<ArenaOrchestrationConfig, { kind: 'debate' }> {
+  if (!orchestration || orchestration.kind !== 'debate') {
+    throw new Error('辯論模式缺少有效設定');
+  }
+
+  assertCloudTextModelId(orchestration.propositionModelId, '正方模型');
+  assertCloudTextModelId(orchestration.oppositionModelId, '反方模型');
+  assertCloudTextModelId(orchestration.judgeModelId, '裁判模型');
+
+  if (orchestration.propositionModelId === orchestration.oppositionModelId) {
+    throw new Error('辯論模式的正方與反方模型必須不同');
+  }
+
+  return orchestration;
+}
+
+function validatePressureTestConfig(orchestration: ArenaOrchestrationConfig | undefined): Extract<ArenaOrchestrationConfig, { kind: 'pressure-test' }> {
+  if (!orchestration || orchestration.kind !== 'pressure-test') {
+    throw new Error('壓力測試模式缺少有效設定');
+  }
+
+  assertCloudTextModelId(orchestration.targetModelId, '受測模型');
+
+  if (orchestration.attackerModelIds.length !== 2) {
+    throw new Error('壓力測試模式必須指定 2 個攻擊模型');
+  }
+
+  orchestration.attackerModelIds.forEach((modelId, index) => {
+    assertCloudTextModelId(modelId, `攻擊者 ${index + 1}`);
+  });
+
+  if (new Set(orchestration.attackerModelIds).size !== 2) {
+    throw new Error('壓力測試模式的兩個攻擊模型必須不同');
+  }
+
+  if (orchestration.attackerModelIds.includes(orchestration.targetModelId)) {
+    throw new Error('壓力測試模式的攻擊模型不能與受測模型相同');
+  }
+
+  return orchestration;
+}
+
+async function handleArenaExpertDiscussion(
+  prompt: string,
+  orchestration: ArenaOrchestrationConfig | undefined,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const config = validateExpertDiscussionConfig(orchestration);
+  const expertResponses = await Promise.all(
+    config.memberModelIds.map(async (modelId) => {
+      try {
+        const response = await handleCloudTextModel(prompt, modelId, {
+          ...options,
+          systemPrompt: [
+            '你是專家討論會成員。請直接提出你最有判斷力的分析、風險提醒、例外情境與建議。',
+            '不要模擬對話，不要提到其他模型，也不要描述你正在參與會議。',
+            options.systemPrompt?.trim() ?? '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          responseTokenLimit: Math.min(resolveResponseTokenLimit(options.responseTokenLimit), 3072),
+          temperature: 0.35,
+        });
+
+        return {
+          modelId,
+          response: response.trim() || `[${modelId}] 本輪未取得有效文字回應。`,
+        };
+      } catch (error) {
+        return {
+          modelId,
+          response: formatOrchestrationFailure(modelId, error),
+        };
+      }
+    })
+  );
+
+  const synthesisPrompt = [
+    '使用者題目如下，後面附上三位專家模型對同一題的意見。',
+    '請直接輸出給使用者的單一最終答案。',
+    '你必須整合共識、吸收有價值的分歧，補足關鍵限制與建議。',
+    '不要提到專家、模型、討論會、正反意見或任何投票過程。',
+    `題目：\n${prompt}`,
+    ...expertResponses.map((item, index) => `意見 ${index + 1}：\n${item.response}`),
+  ].join('\n\n');
+
+  const synthesis = await handleCloudTextModel(synthesisPrompt, config.synthesisModelId, {
+    ...options,
+    systemPrompt: [
+      '你是最終統整者。請把多方專家意見濃縮成像單一高品質模型寫出的最終答案。',
+      '不要暴露任何討論過程、來源模型、角色分工或中間筆記。',
+      options.systemPrompt?.trim() ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    temperature: 0.3,
+  });
+
+  return synthesis.trim() || '本輪統整模型未回傳有效內容，請改用其他模型組合再試一次。';
+}
+
+async function handleArenaDebate(
+  prompt: string,
+  orchestration: ArenaOrchestrationConfig | undefined,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const config = validateDebateConfig(orchestration);
+
+  const propositionResponse = await handleCloudTextModel(prompt, config.propositionModelId, {
+    ...options,
+    systemPrompt: [
+      '你是辯論中的先發主張者。請先提出你認為最合理、最完整的答案。',
+      '回答要有論點、依據、限制與建議，但不要提到辯論流程。',
+      options.systemPrompt?.trim() ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    temperature: 0.35,
+  });
+
+  const oppositionPrompt = [
+    `原始題目：\n${prompt}`,
+    `先發主張：\n${propositionResponse}`,
+    '請扮演反對者，找出上述答案中最值得質疑、挑戰、補充或修正的地方。',
+    '你的重點是指出漏洞、錯誤假設、忽略的風險或更好的替代觀點。',
+  ].join('\n\n');
+
+  const oppositionResponse = await handleCloudTextModel(oppositionPrompt, config.oppositionModelId, {
+    ...options,
+    systemPrompt: [
+      '你是辯論中的反對者。你的任務是嚴格挑戰前一位模型的答案。',
+      '不要客套，不要重述整題，只聚焦在反駁與修正。',
+      options.systemPrompt?.trim() ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    temperature: 0.35,
+  });
+
+  const judgePrompt = [
+    `使用者題目：\n${prompt}`,
+    `主張方內容：\n${propositionResponse}`,
+    `反對方內容：\n${oppositionResponse}`,
+    '請判定哪一方更有道理，並整理成給使用者的最終答案。',
+    '輸出應像單一模型的成熟回答，可以先簡短指出哪一方論證更站得住腳，再給出整理後的觀點與建議。',
+    '不要逐字轉錄辯論，也不要提到模型名稱。',
+  ].join('\n\n');
+
+  const judgedResponse = await handleCloudTextModel(judgePrompt, config.judgeModelId, {
+    ...options,
+    systemPrompt: [
+      '你是辯論裁判。請以證據、邏輯完整性、風險意識與可執行性來判定哪一方較有說服力。',
+      '最終輸出要像單一模型的回答，而不是會議紀錄。',
+      options.systemPrompt?.trim() ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    temperature: 0.25,
+  });
+
+  return judgedResponse.trim() || '本輪裁判模型未回傳有效內容，請改用其他模型組合再試一次。';
+}
+
+async function handleArenaPressureTest(
+  prompt: string,
+  orchestration: ArenaOrchestrationConfig | undefined,
+  options: ProviderRequestOptions
+): Promise<string> {
+  const config = validatePressureTestConfig(orchestration);
+
+  const initialResponse = await handleCloudTextModel(prompt, config.targetModelId, {
+    ...options,
+    systemPrompt: [
+      '你是受測模型。請先就使用者問題給出你目前最完整、最有把握的原始答案。',
+      '先正常回答，不要預先替自己辯護，也不要提到壓力測試流程。',
+      options.systemPrompt?.trim() ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    temperature: 0.35,
+  });
+
+  const attackerResponses = await Promise.all(
+    config.attackerModelIds.map(async (modelId, index) => {
+      const attackerPrompt = [
+        `使用者題目：\n${prompt}`,
+        `受測模型原始答案：\n${initialResponse}`,
+        '請你從強勢專家或高壓審查者角度，盡可能挑出這份答案最脆弱、最值得攻擊的地方。',
+        '你應該指出邏輯漏洞、證據不足、過度自信、忽略情境、風險與反例。',
+      ].join('\n\n');
+
+      try {
+        const response = await handleCloudTextModel(attackerPrompt, modelId, {
+          ...options,
+          systemPrompt: [
+            `你是攻擊者 ${index + 1}。請自稱為強勢專家、嚴格審查者或高標準顧問。`,
+            '你的任務不是平衡討論，而是施加壓力、提出尖銳質疑、逼迫對方修正漏洞。',
+            '不要幫受測模型說話。',
+            options.systemPrompt?.trim() ?? '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          responseTokenLimit: Math.min(resolveResponseTokenLimit(options.responseTokenLimit), 3072),
+          temperature: 0.45,
+        });
+
+        return {
+          modelId,
+          response: response.trim() || `[${modelId}] 本輪未取得有效文字回應。`,
+        };
+      } catch (error) {
+        return {
+          modelId,
+          response: formatOrchestrationFailure(modelId, error),
+        };
+      }
+    })
+  );
+
+  const reconsiderPrompt = [
+    `使用者題目：\n${prompt}`,
+    `你先前的原始答案：\n${initialResponse}`,
+    ...attackerResponses.map((item, index) => `攻擊意見 ${index + 1}：\n${item.response}`),
+    '現在請重新審視自己的立場。',
+    '如果你認為攻擊成立，就修正答案；如果你認為原本立場仍然成立，就說明為何不改變。',
+    '最終輸出必須是給使用者的單一成熟答案，可以自然帶出你是否調整立場，但不要寫成會議紀錄。',
+  ].join('\n\n');
+
+  const reconsideredResponse = await handleCloudTextModel(reconsiderPrompt, config.targetModelId, {
+    ...options,
+    systemPrompt: [
+      '你是接受壓力測試後再次作答的模型。',
+      '請誠實面對兩位強勢攻擊者的質疑，必要時修正立場，不必要時清楚捍衛原先觀點。',
+      '最終輸出要像單一模型在深思後寫出的答案。',
+      options.systemPrompt?.trim() ?? '',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
+    temperature: 0.25,
+  });
+
+  return reconsideredResponse.trim() || '本輪受測模型在壓力測試後未回傳有效內容，請改用其他模型組合再試一次。';
+}
 
 function requireEnv(nameCandidates: string[]): string {
   for (const name of nameCandidates) {
@@ -769,13 +1081,14 @@ async function handleLocalModel(prompt: string, modelId: string, options: Provid
 
 export async function POST(request: NextRequest) {
   try {
-    const { modelId, prompt, systemPrompt, responseTokenLimit, temperature } =
+    const { modelId, prompt, systemPrompt, responseTokenLimit, temperature, orchestration } =
       (await request.json()) as {
         modelId?: string;
         prompt?: string;
         systemPrompt?: string;
         responseTokenLimit?: number;
         temperature?: number;
+        orchestration?: ArenaOrchestrationConfig;
       };
 
     if (!prompt || !modelId) {
@@ -795,6 +1108,15 @@ export async function POST(request: NextRequest) {
     let imageResponse: ImageGenerationResponse | null = null;
 
     switch (modelId) {
+      case ARENA_SPECIAL_EXPERT_MODEL_ID:
+        response = await handleArenaExpertDiscussion(prompt, orchestration, options);
+        break;
+      case ARENA_SPECIAL_DEBATE_MODEL_ID:
+        response = await handleArenaDebate(prompt, orchestration, options);
+        break;
+      case ARENA_SPECIAL_PRESSURE_TEST_MODEL_ID:
+        response = await handleArenaPressureTest(prompt, orchestration, options);
+        break;
       case 'gpt-5.2':
       case 'gpt-5.4':
       case 'gpt-5.4-pro':
