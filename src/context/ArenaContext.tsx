@@ -24,6 +24,7 @@ interface ArenaState {
   session: ArenaSession | null;
   currentResponses: ModelResponse[];
   isLoading: boolean;
+  loadingProgress: { done: number; total: number } | null;
   error: string | null;
 }
 
@@ -33,6 +34,7 @@ type ArenaAction =
   | { type: 'SET_SELECTED_MODELS'; payload: AIModel[] }
   | { type: 'START_SESSION'; payload: { models: AIModel[]; mode: ArenaMode } }
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_PROGRESS'; payload: { done: number; total: number } | null }
   | { type: 'SET_RESPONSES'; payload: ModelResponse[] }
   | { type: 'UPDATE_RESPONSE'; payload: { index: number; response: Partial<ModelResponse> } }
   | { type: 'SET_SESSION'; payload: ArenaSession }
@@ -52,6 +54,7 @@ const initialState: ArenaState = {
   session: null,
   currentResponses: [],
   isLoading: false,
+  loadingProgress: null,
   error: null,
 };
 
@@ -88,6 +91,9 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
 
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
+
+    case 'SET_PROGRESS':
+      return { ...state, loadingProgress: action.payload };
 
     case 'SET_RESPONSES':
       return { ...state, currentResponses: action.payload };
@@ -130,6 +136,7 @@ function arenaReducer(state: ArenaState, action: ArenaAction): ArenaState {
         ...state,
         currentResponses: [],
         isLoading: false,
+        loadingProgress: null,
         error: null,
       };
 
@@ -241,15 +248,13 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
   };
 
   const submitPrompt = async (prompt: string) => {
-    const { callModel } = await import('@/lib/api');
-    
+    const { callModelStream } = await import('@/lib/api');
+
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
-    // Shuffle models to randomize blind assignment
     const shuffledModels = [...state.selectedModels].sort(() => Math.random() - 0.5);
 
-    // Initialize responses with loading state
     const initialResponses: ModelResponse[] = shuffledModels.map((model, index) => ({
       modelId: model.id,
       blindName: BLIND_NAMES[index],
@@ -260,12 +265,37 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
 
     dispatch({ type: 'SET_RESPONSES', payload: initialResponses });
 
+    const isOpen = state.arenaMode === 'open';
+    const total = shuffledModels.length;
+    let completed = 0;
+    dispatch({ type: 'SET_PROGRESS', payload: { done: 0, total } });
+
+    const markCompleted = () => {
+      completed += 1;
+      dispatch({ type: 'SET_PROGRESS', payload: { done: completed, total } });
+    };
+
     const requests = shuffledModels.map(async (model, index) => {
       try {
-        const response = await callModel(model.id, prompt, {
-          orchestration: model.orchestration,
-        });
+        let accumulated = '';
+        const response = await callModelStream(
+          model.id,
+          prompt,
+          { orchestration: model.orchestration },
+          isOpen
+            ? {
+                onToken: (token) => {
+                  accumulated += token;
+                  dispatch({
+                    type: 'UPDATE_RESPONSE',
+                    payload: { index, response: { response: accumulated } },
+                  });
+                },
+              }
+            : {}
+        );
 
+        markCompleted();
         return {
           index,
           response: {
@@ -275,6 +305,7 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
           },
         };
       } catch (error) {
+        markCompleted();
         return {
           index,
           response: {
@@ -314,6 +345,7 @@ export function ArenaProvider({ children }: ArenaProviderProps) {
     }
 
     dispatch({ type: 'SET_LOADING', payload: false });
+    dispatch({ type: 'SET_PROGRESS', payload: null });
   };
 
   const submitRanking = (rankings: RankingResult[], prompt: string) => {

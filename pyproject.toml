@@ -5,7 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "anthropic",
+    "anthropic[vertex]",
+    "google-cloud-aiplatform>=1.148.1",
     "google-genai",
     "openai",
     "python-dotenv",

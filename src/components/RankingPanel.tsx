@@ -166,7 +166,7 @@ export default function RankingPanel({ responses, models, mode, onSubmit }: Rank
 
                   return (
                     <option key={rank} value={rank} disabled={isUsed}>
-                      第 {rank} 名 {rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉'}
+                      第 {rank} 名
                     </option>
                   );
                 })}
@@ -234,7 +234,6 @@ function SortableItem({ id, label, rank }: SortableItemProps) {
     transition,
   };
 
-  const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
   const rankBg =
     rank === 1
       ? 'bg-[var(--gold-500)]'
@@ -256,7 +255,6 @@ function SortableItem({ id, label, rank }: SortableItemProps) {
         {rank}
       </div>
       <span className="flex-1 font-medium text-[var(--slate-700)]">{label}</span>
-      <span className="text-2xl">{rankEmoji}</span>
       <svg className="h-6 w-6 text-[var(--slate-400)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
       </svg>

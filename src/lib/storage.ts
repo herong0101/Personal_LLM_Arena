@@ -47,13 +47,24 @@ export function saveSessionToHistory(session: ArenaSession): void {
 
 export function loadSessionHistory(): ArenaSession[] {
   if (typeof window === 'undefined') return [];
-  
+
   try {
     const data = localStorage.getItem(STORAGE_KEYS.sessionHistory);
     return data ? JSON.parse(data) : [];
   } catch (error) {
     console.error('Failed to load session history:', error);
     return [];
+  }
+}
+
+export function deleteSessionFromHistory(sessionId: string): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const history = loadSessionHistory().filter((session) => session.id !== sessionId);
+    localStorage.setItem(STORAGE_KEYS.sessionHistory, JSON.stringify(history));
+  } catch (error) {
+    console.error('Failed to delete session from history:', error);
   }
 }
 

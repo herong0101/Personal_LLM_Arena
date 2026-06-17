@@ -9,8 +9,6 @@ interface SidebarProps {
   onSelectRound?: (roundId: string | null) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
 export default function Sidebar({
@@ -18,106 +16,33 @@ export default function Sidebar({
   onSelectRound,
   isMobileOpen = false,
   onCloseMobile,
-  isCollapsed = false,
-  onToggleCollapse,
 }: SidebarProps) {
   const { state, getRoundCount } = useArena();
   const { arenaMode, session } = state;
 
   const rounds = session?.rounds || [];
-  const showCollapsedLayout = isCollapsed && !isMobileOpen;
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex h-full w-[min(22rem,88vw)] flex-col border-r border-[var(--border-soft)] bg-[rgba(255,251,245,0.9)] backdrop-blur-xl transition-[transform,width] duration-300 lg:static lg:translate-x-0 ${
-        showCollapsedLayout ? 'lg:w-[5.5rem]' : 'lg:w-80'
-      } ${
-        isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}
+      className="fixed inset-y-0 left-0 flex h-full w-[min(20rem,88vw)] flex-col border-r border-[var(--border-soft)] bg-white/95 shadow-[20px_0_50px_rgba(15,23,42,0.14)] backdrop-blur-xl transition-transform duration-300"
+      style={{
+        zIndex: 90,
+        transform: isMobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+      }}
     >
-      {showCollapsedLayout ? (
-        <>
-          <div className="flex items-center justify-center border-b border-[var(--border-soft)] p-3">
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="soft-button flex h-11 w-11 items-center justify-center rounded-2xl text-[var(--slate-600)]"
-              title="展開對戰紀錄"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-                <path d="m9 6 6 6-6 6" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="flex items-center justify-center px-3 pt-3">
-            <div className="rounded-full bg-[rgba(24,172,126,0.1)] px-3 py-1 text-[11px] font-semibold text-[var(--emerald-700)]">
-              {getRoundCount()}/10
-            </div>
-          </div>
-
-          <div className="px-3 pt-3">
-            <button
-              type="button"
-              onClick={() => onSelectRound?.(null)}
-              className={`flex h-11 w-full items-center justify-center rounded-2xl border transition-colors ${
-                selectedRoundId === null
-                  ? 'border-[rgba(24,172,126,0.24)] bg-[rgba(24,172,126,0.1)] text-[var(--emerald-700)]'
-                  : 'border-[var(--border-soft)] bg-white/70 text-[var(--slate-600)] hover:border-[rgba(24,172,126,0.24)] hover:text-[var(--emerald-700)]'
-              }`}
-              title="回到目前局"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4">
-            {rounds.map((round, index) => (
-              <button
-                key={round.id}
-                type="button"
-                onClick={() => onSelectRound?.(selectedRoundId === round.id ? null : round.id)}
-                className={`flex h-11 w-full items-center justify-center rounded-2xl text-sm font-semibold transition-colors ${
-                  selectedRoundId === round.id
-                    ? 'bg-[rgba(24,172,126,0.12)] text-[var(--emerald-700)]'
-                    : 'bg-white/70 text-[var(--slate-600)] hover:text-[var(--emerald-700)]'
-                }`}
-                title={`第 ${index + 1} 局`}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="border-b border-[var(--border-soft)] p-5">
+      <div className="border-b border-[var(--border-soft)] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-serif text-xl font-semibold text-[var(--slate-900)]">對戰紀錄</h2>
+                <h2 className="text-lg font-semibold text-[var(--slate-900)]">對戰紀錄</h2>
                 <p className="mt-1 text-sm text-[var(--slate-500)]">{getRoundCount()} / 10 局</p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onToggleCollapse}
-                  className="soft-button hidden rounded-full px-3 py-2 text-xs font-medium text-[var(--slate-600)] lg:inline-flex"
-                  title="收起對戰紀錄"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-                    <path d="m15 6-6 6 6 6" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={onCloseMobile}
-                  className="soft-button rounded-full px-3 py-2 text-xs font-medium lg:hidden"
-                >
-                  關閉
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="soft-button rounded-full px-3 py-2 text-xs font-medium"
+              >
+                關閉
+              </button>
             </div>
             <div className="mt-3 inline-flex items-center rounded-full bg-[rgba(24,172,126,0.1)] px-3 py-1 text-xs font-medium text-[var(--emerald-700)]">
               {ARENA_MODE_LABELS[arenaMode]}
@@ -136,9 +61,9 @@ export default function Sidebar({
             >
               回到目前局並繼續問答
             </button>
-          </div>
+      </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div className="flex-1 space-y-3 overflow-y-auto p-3">
             {rounds.length === 0 ? (
               <div className="rounded-[1.5rem] border border-dashed border-[var(--marble-300)] px-4 py-10 text-center text-sm text-[var(--slate-500)]">
                 <svg
@@ -170,13 +95,7 @@ export default function Sidebar({
                 />
               ))
             )}
-          </div>
-
-          <div className="border-t border-[var(--border-soft)] p-4">
-            <div className="text-center text-xs text-[var(--slate-500)]">Arena of Intelligence</div>
-          </div>
-        </>
-      )}
+      </div>
     </aside>
   );
 }

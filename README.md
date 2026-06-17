@@ -4,6 +4,8 @@
 
 - 盲測模式
 - 非盲測模式
+- Graph Builder：用分支與匯流展示 LangGraph 和線性 chain 的差異
+- Loop 工程實驗室：模型自動改善後回到人工評分，通過人工標準才算合格
 - 真實模型串接：GPT-5.2、Gemini 3.1 Pro Preview、Claude Opus 4.5
 - 地端模型串接：Ollama 4090 / Ollama 5090 / vLLM 4090 的精選模型
 - 遊戲結束後的平均排名、名次統計與使用者回饋匯出成 JSON

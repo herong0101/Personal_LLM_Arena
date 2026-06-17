@@ -25,6 +25,13 @@ export type ArenaOrchestrationConfig =
       attackerModelIds: string[];
     };
 
+// Stream events (shared between server and client)
+export type StreamChunk =
+  | { type: 'stage'; name: string; label: string }
+  | { type: 'token'; content: string }
+  | { type: 'done'; response: string; images?: Array<{ mimeType: string; data: string }> }
+  | { type: 'error'; message: string };
+
 // Model types
 export interface AIModel {
   id: string;
@@ -208,4 +215,34 @@ export interface StudioConversation {
   documents: StudioDocument[];
   memory: StudioMemory;
   settings: StudioConversationSettings;
+}
+
+export interface NoCodeGraphStep {
+  id: string;
+  label: string;
+  modelId: string;
+  promptTemplate: string;
+  x?: number;
+  y?: number;
+}
+
+export interface NoCodeGraphEdge {
+  id: string;
+  from: string;
+  to: string;
+}
+
+export interface NoCodeGraphDefinition {
+  id?: string;
+  name: string;
+  steps: NoCodeGraphStep[];
+  edges?: NoCodeGraphEdge[];
+}
+
+export interface NoCodeGraphRunResult {
+  stepId: string;
+  label: string;
+  modelId: string;
+  output: string;
+  durationMs?: number;
 }
